@@ -1,6 +1,10 @@
 __pycache__/
 *.pyc
 .DS_Store
+.vercel/
+.env
+.env.*
+!.env.example
 work/*.json
 data/*.jsonl
 outputs/*.zip

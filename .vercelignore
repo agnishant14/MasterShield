@@ -2,6 +2,8 @@
 .gitignore
 __pycache__
 *.pyc
+*.md
+Makefile
 tests
 docs
 scripts
