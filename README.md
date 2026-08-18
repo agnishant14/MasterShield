@@ -83,7 +83,7 @@ sentinel/engine.py        # closed-loop orchestration and API-ready state
 web/                      # operations console
 tests/                    # deterministic unit and integration-style tests
 scripts/                  # dataset export and model report helpers
-docs/                     # architecture and pitch-deck blueprint
+docs/                     # architecture notes and demo runbook
 ```
 
 ## Evaluation Notes
