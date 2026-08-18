@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+from sentinel import DefenseEngine
+from sentinel.features import FEATURES, vectorize
+from sentinel.generator import SyntheticGenerator
+from sentinel.taxonomy import ATTACKS, ATTACK_BY_ID
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class AttackCatalogTests(unittest.TestCase):
+    def test_catalog_has_breadth_and_unique_ids(self) -> None:
+        self.assertEqual(24, len(ATTACKS))
+        self.assertEqual(24, len(ATTACK_BY_ID))
+        self.assertGreaterEqual(len({attack.family for attack in ATTACKS}), 14)
+        self.assertGreaterEqual(len({attack.rail for attack in ATTACKS}), 8)
+
+    def test_every_scenario_is_actionable(self) -> None:
+        for attack in ATTACKS:
+            self.assertGreaterEqual(len(attack.leading_signals), 4)
+            self.assertGreaterEqual(len(attack.mitigations), 3)
+            self.assertTrue(attack.simulation_recipe)
+
+
+class GeneratorTests(unittest.TestCase):
+    def test_seed_is_reproducible(self) -> None:
+        first = SyntheticGenerator(99).generate_attacks(4, ["atk-001"])
+        second = SyntheticGenerator(99).generate_attacks(4, ["atk-001"])
+        self.assertEqual(first, second)
+
+    def test_attack_recipe_moves_correlated_signals(self) -> None:
+        generator = SyntheticGenerator(7)
+        rows = generator.generate_attacks(30, ["atk-001"], intensity=1.1)
+        self.assertTrue(all(row["label"] == 1 for row in rows))
+        self.assertGreater(sum(row["new_payee"] for row in rows) / len(rows), 0.9)
+        self.assertGreater(sum(row["prompt_pressure_score"] for row in rows) / len(rows), 0.6)
+        self.assertGreater(sum(row["graph_mule_score"] for row in rows) / len(rows), 0.4)
+
+    def test_feature_vector_is_complete(self) -> None:
+        row = SyntheticGenerator(3).generate_legitimate(1)[0]
+        values = vectorize(row)
+        self.assertEqual(len(FEATURES), len(values))
+        self.assertTrue(all(isinstance(value, float) for value in values))
+
+
+class ClosedLoopTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.engine = DefenseEngine(seed=2026)
+
+    def test_model_meets_simulated_holdout_guardrails(self) -> None:
+        metrics = self.engine.metrics
+        self.assertGreaterEqual(metrics["f1"], 0.9)
+        self.assertGreaterEqual(metrics["recall"], 0.9)
+        self.assertLessEqual(metrics["false_positive_rate"], 0.035)
+        self.assertEqual(24, self.engine.history[-1]["attack_coverage"])
+
+    def test_scoring_returns_decision_and_explanations(self) -> None:
+        row = SyntheticGenerator(11).generate_attacks(1, ["atk-005"], intensity=1.2)[0]
+        scored = self.engine.score_transaction(row)
+        self.assertIn(scored["decision"], {"approve", "review", "decline"})
+        self.assertGreaterEqual(scored["risk_score"], 0)
+        self.assertIsInstance(scored["explanations"], list)
+
+    def test_feedback_advances_cycle(self) -> None:
+        previous_cycle = self.engine.cycle
+        run = self.engine.simulate(["atk-016", "atk-018"], count=25, intensity=1.05)
+        self.assertEqual(25, run["feedback_ready"])
+        result = self.engine.retrain()
+        self.assertEqual(previous_cycle + 1, result["cycle"])
+        self.assertEqual(0, len(self.engine.feedback_rows))
+
+
+class WebArtifactTests(unittest.TestCase):
+    def test_web_console_has_all_judge_views(self) -> None:
+        html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+        for view in ("view-overview", "view-attacks", "view-simulate", "view-defense", "view-evidence"):
+            self.assertIn(view, html)
+        self.assertIn("independent challenge prototype", html.lower())
+
+
+if __name__ == "__main__":
+    unittest.main()

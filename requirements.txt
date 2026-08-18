@@ -1,0 +1,2 @@
+# MasterShield AI has no mandatory third-party runtime dependencies.
+# The standard-library implementation keeps the challenge prototype reproducible.
