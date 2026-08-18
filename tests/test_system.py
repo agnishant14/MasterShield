@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import json
 import unittest
+from io import BytesIO
 from pathlib import Path
 
 from sentinel import DefenseEngine
 from sentinel.features import FEATURES, vectorize
 from sentinel.generator import SyntheticGenerator
 from sentinel.taxonomy import ATTACKS, ATTACK_BY_ID
+from app import app
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,6 +99,34 @@ class WebArtifactTests(unittest.TestCase):
         for view in ("view-overview", "view-attacks", "view-simulate", "view-defense", "view-evidence"):
             self.assertIn(view, html)
         self.assertIn("independent challenge prototype", html.lower())
+
+    def test_vercel_wsgi_entrypoint_serves_health_and_console(self) -> None:
+        def request(path: str, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], bytes]:
+            captured: dict[str, object] = {}
+
+            def start_response(status: str, headers: list[tuple[str, str]], _exc_info=None) -> None:
+                captured["status"] = status
+                captured["headers"] = dict(headers)
+
+            environ = {
+                "REQUEST_METHOD": method,
+                "PATH_INFO": path,
+                "QUERY_STRING": "",
+                "CONTENT_LENGTH": str(len(body)),
+                "wsgi.input": BytesIO(body),
+            }
+            response = b"".join(app(environ, start_response))
+            return captured["status"], captured["headers"], response
+
+        status, headers, body = request("/api/health")
+        self.assertEqual("200 OK", status)
+        self.assertEqual("application/json; charset=utf-8", headers["Content-Type"])
+        self.assertEqual("ok", json.loads(body)["status"])
+
+        status, headers, body = request("/")
+        self.assertEqual("200 OK", status)
+        self.assertIn("text/html", headers["Content-Type"])
+        self.assertIn(b"MasterShield", body)
 
 
 if __name__ == "__main__":

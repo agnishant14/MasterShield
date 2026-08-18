@@ -9,6 +9,7 @@ import mimetypes
 import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -28,6 +29,107 @@ def _parse_json_object(raw: bytes) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("Request body must be a JSON object")
     return payload
+
+
+def _json_response(payload: object, status: int = HTTPStatus.OK) -> tuple[int, list[tuple[str, str]], bytes]:
+    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    headers = [
+        ("Content-Type", "application/json; charset=utf-8"),
+        ("Content-Length", str(len(body))),
+        ("Cache-Control", "no-store"),
+        ("X-Content-Type-Options", "nosniff"),
+    ]
+    return int(status), headers, body
+
+
+def _static_response(relative: str) -> tuple[int, list[tuple[str, str]], bytes]:
+    requested = (WEB_ROOT / relative.lstrip("/")).resolve()
+    web_root = WEB_ROOT.resolve()
+    if web_root not in requested.parents and requested != web_root:
+        return _json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+    if requested.is_dir():
+        requested = requested / "index.html"
+    if not requested.exists() or not requested.is_file():
+        if Path(relative).suffix:
+            return _json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+        requested = WEB_ROOT / "index.html"
+    body = requested.read_bytes()
+    content_type = mimetypes.guess_type(str(requested))[0] or "application/octet-stream"
+    content_header = f"{content_type}; charset=utf-8" if content_type.startswith("text/") else content_type
+    headers = [
+        ("Content-Type", content_header),
+        ("Content-Length", str(len(body))),
+        ("Cache-Control", "no-cache"),
+        ("X-Content-Type-Options", "nosniff"),
+        ("X-Frame-Options", "SAMEORIGIN"),
+    ]
+    return int(HTTPStatus.OK), headers, body
+
+
+def _read_wsgi_body(environ: dict) -> dict:
+    try:
+        length = int(environ.get("CONTENT_LENGTH") or "0")
+    except ValueError as exc:
+        raise ValueError("Content-Length must be an integer") from exc
+    if length > 1_000_000:
+        raise ValueError("Request body too large")
+    stream = environ.get("wsgi.input") or BytesIO()
+    return _parse_json_object(stream.read(length) if length else b"{}")
+
+
+def _dispatch_wsgi(environ: dict) -> tuple[int, list[tuple[str, str]], bytes]:
+    """Dispatch a Vercel WSGI request using the same engine as the local server."""
+    method = environ.get("REQUEST_METHOD", "GET").upper()
+    path = environ.get("PATH_INFO") or "/"
+    query = parse_qs(environ.get("QUERY_STRING", ""), keep_blank_values=True)
+    try:
+        if method == "GET":
+            if path == "/api/health":
+                return _json_response({"status": "ok", "model_version": f"hybrid-logit-c{ENGINE.cycle}"})
+            if path == "/api/overview":
+                return _json_response(ENGINE.overview())
+            if path == "/api/attacks":
+                return _json_response({"attacks": ENGINE.attacks()})
+            if path == "/api/transactions":
+                try:
+                    limit = int(query.get("limit", ["100"])[0])
+                except ValueError as exc:
+                    raise ValueError("limit must be an integer") from exc
+                return _json_response({"transactions": ENGINE.transactions(limit)})
+            if path.startswith("/api/"):
+                return _json_response({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
+            return _static_response(path)
+
+        if method == "POST":
+            payload = _read_wsgi_body(environ)
+            if path == "/api/simulate":
+                result = ENGINE.simulate(
+                    payload.get("attack_ids") or [],
+                    payload.get("count", 80),
+                    payload.get("intensity", 1.0),
+                )
+                return _json_response(result, HTTPStatus.CREATED)
+            if path == "/api/retrain":
+                return _json_response(ENGINE.retrain())
+            if path == "/api/score":
+                return _json_response(ENGINE.score_transaction(payload))
+            return _json_response({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
+
+        if method == "HEAD":
+            status, headers, body = _dispatch_wsgi({**environ, "REQUEST_METHOD": "GET"})
+            return status, headers, b""
+        return _json_response({"error": "Method not allowed"}, HTTPStatus.METHOD_NOT_ALLOWED)
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        return _json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+    except Exception as exc:  # pragma: no cover - top-level guard for serverless resilience
+        return _json_response({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+def app(environ: dict, start_response) -> list[bytes]:
+    """WSGI entrypoint used by Vercel's Python runtime."""
+    status, headers, body = _dispatch_wsgi(environ)
+    start_response(f"{status} {HTTPStatus(status).phrase}", headers)
+    return [body]
 
 
 class AppHandler(BaseHTTPRequestHandler):

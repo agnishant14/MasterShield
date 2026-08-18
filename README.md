@@ -36,6 +36,19 @@ Optional flags:
 python3 app.py --host 0.0.0.0 --port 8765
 ```
 
+## Deploy to Vercel
+
+The repository includes a Vercel configuration and a WSGI entrypoint in `app.py`. From the project directory:
+
+```bash
+npx vercel login
+npx vercel
+```
+
+Use `npx vercel --prod` when you are ready to promote the deployment to a production URL. Vercel will detect `requirements.txt`, build the Python function, and route both the API and the `web/` console through the same entrypoint.
+
+This deployment is suitable for demos and reviews. `DefenseEngine` keeps feedback, transactions, and model state in process memory, so Vercel cold starts or multiple serverless instances can reset or diverge from that state. A production rollout should move those stores to durable infrastructure such as Vercel KV, Postgres, or another managed database.
+
 The first boot trains two model cycles so the overview can show hard-case mining. On a modern laptop this usually takes a few seconds.
 
 ## API Surface
@@ -90,4 +103,3 @@ python3 -m unittest discover -s tests -v
 python3 scripts/train_model.py --report work/model-report.json
 python3 scripts/generate_dataset.py --rows 10000 --output data/synthetic_payments.jsonl
 ```
-
