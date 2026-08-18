@@ -20,6 +20,16 @@ WEB_ROOT = ROOT / "web"
 ENGINE = DefenseEngine()
 
 
+def _parse_json_object(raw: bytes) -> dict:
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Request body must be valid UTF-8 JSON") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object")
+    return payload
+
+
 class AppHandler(BaseHTTPRequestHandler):
     server_version = "MasterShield/1.0"
 
@@ -34,11 +44,14 @@ class AppHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _body(self) -> dict:
-        length = int(self.headers.get("Content-Length", "0"))
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            raise ValueError("Content-Length must be an integer") from exc
         if length > 1_000_000:
             raise ValueError("Request body too large")
         raw = self.rfile.read(length) if length else b"{}"
-        return json.loads(raw.decode("utf-8"))
+        return _parse_json_object(raw)
 
     def _static(self, relative: str) -> None:
         requested = (WEB_ROOT / relative.lstrip("/")).resolve()
@@ -48,6 +61,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if requested.is_dir():
             requested = requested / "index.html"
         if not requested.exists() or not requested.is_file():
+            if Path(relative).suffix:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
             requested = WEB_ROOT / "index.html"
         body = requested.read_bytes()
         content_type = mimetypes.guess_type(str(requested))[0] or "application/octet-stream"
@@ -70,12 +86,17 @@ class AppHandler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/attacks":
                 self._json({"attacks": ENGINE.attacks()})
             elif parsed.path == "/api/transactions":
-                limit = int(parse_qs(parsed.query).get("limit", ["100"])[0])
+                try:
+                    limit = int(parse_qs(parsed.query).get("limit", ["100"])[0])
+                except ValueError as exc:
+                    raise ValueError("limit must be an integer") from exc
                 self._json({"transactions": ENGINE.transactions(limit)})
             elif parsed.path.startswith("/api/"):
                 self._json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
             else:
                 self._static(parsed.path if parsed.path != "/" else "/index.html")
+        except (ValueError, TypeError) as exc:
+            self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except Exception as exc:  # pragma: no cover - top-level guard for prototype resilience
             self._json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -124,4 +145,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

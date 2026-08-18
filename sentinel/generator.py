@@ -194,6 +194,21 @@ class SyntheticGenerator:
             bump("llm_similarity_score", 0.25)
             tx["new_payee"] = int(r.random() < 0.62)
 
+        # Scenario-specific controls that do not map cleanly to a shared family.
+        # Keep these overlays explicit so the catalog recipe and generated signals
+        # remain aligned without adding categorical model features.
+        if attack.id == "atk-009":  # adaptive OTP relay
+            tx["remote_access"] = 1
+        elif attack.id == "atk-016":  # passkey fallback manipulation
+            tx["auth_downgrade"] = 1
+            tx["new_payee"] = 1
+        elif attack.id == "atk-022":  # synthetic supplier onboarding
+            tx["merchant_age_days"] = int(10 + r.random() * 90)
+            bump("merchant_age_risk", 0.62)
+            bump("descriptor_drift", 0.4)
+        elif attack.id == "atk-023":  # voice-auth replay synthesis
+            tx["new_payee"] = int(r.random() < 0.8)
+
         # Shared GenAI fingerprints: unusually polished interaction paired with pressure.
         bump("llm_similarity_score", 0.18)
         tx["attack_id"] = attack.id
@@ -239,4 +254,3 @@ def scenario_stats(rows: list[dict]) -> dict:
         "coverage": len(by_scenario),
         "by_scenario": by_scenario,
     }
-

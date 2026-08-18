@@ -26,6 +26,7 @@ class DefenseEngine:
         self.live_transactions: list[dict] = []
         self.history: list[dict] = []
         self.metrics: dict = {}
+        self.holdout_rows: list[dict] = []
         self._bootstrap()
 
     def _bootstrap(self) -> None:
@@ -44,12 +45,13 @@ class DefenseEngine:
         self.detector.fit(train)
         self.detector.calibrate(calibration)
         baseline = self.detector.evaluate(evaluation)
+        self.holdout_rows = list(evaluation)
         self.cycle = 1
         self.history.append(self._history_point("Initial frontier", baseline, evaluation))
 
-        # Closed-loop hard-case mining: unknown scenarios and false negatives become training data.
-        hard_cases = [row for row in evaluation if row["label"] == 1 and self.detector.predict(row) == 0]
+        # Mine errors from a separate frontier sample so evaluation remains untouched.
         frontier = self.generator.generate_attacks(560, [attack.id for attack in ATTACKS[16:]], intensity=0.88)
+        hard_cases = [row for row in frontier if self.detector.predict(row) == 0]
         stabilizers = self.generator.generate_legitimate(720)
         self.training_rows.extend(hard_cases * 2 + frontier + stabilizers)
         random.Random(self.seed + 3).shuffle(self.training_rows)
@@ -61,6 +63,14 @@ class DefenseEngine:
 
         seed_stream = self.generator.generate_mixed(140, attack_rate=0.22, intensity=1.02)
         self.live_transactions = [self.detector.score_and_annotate(row) for row in seed_stream][-140:]
+
+    def _risk_distribution(self, rows: list[dict], bins: int = 10) -> dict:
+        distribution = {"legitimate": [0] * bins, "attack": [0] * bins}
+        for row in rows:
+            score = self.detector.score(row)
+            index = min(bins - 1, int(score * bins))
+            distribution["attack" if row.get("label") else "legitimate"][index] += 1
+        return distribution
 
     def _history_point(self, name: str, metrics: dict, rows: list[dict]) -> dict:
         detected_ids = {
@@ -112,11 +122,16 @@ class DefenseEngine:
                 "detected_attack_coverage": len(detected_attack_ids),
                 "training_rows": len(self.training_rows),
                 "stream_size": len(self.live_transactions),
+                "feedback_queue_size": len(self.feedback_rows),
                 "decisions": dict(decisions),
                 "attack_mix": [{"name": name, "count": count} for name, count in attack_mix.most_common(7)],
                 "feature_importance": self.detector.feature_importance(),
                 "attack_performance": self._attack_performance(),
                 "recent_transactions": list(reversed(self.live_transactions[-24:])),
+                "validation": {
+                    "sample_count": len(self.holdout_rows),
+                    "risk_distribution": self._risk_distribution(self.holdout_rows),
+                },
                 "system": {
                     "red_team": "online",
                     "simulator": "online",
@@ -128,16 +143,17 @@ class DefenseEngine:
             }
 
     def attacks(self) -> list[dict]:
-        performance = {item["attack_id"]: item for item in self._attack_performance()}
-        rows = []
-        for attack in catalog():
-            attack.update({
-                "samples": performance[attack["id"]]["samples"],
-                "detection_rate": performance[attack["id"]]["detection_rate"],
-                "mean_risk": performance[attack["id"]]["mean_risk"],
-            })
-            rows.append(attack)
-        return rows
+        with self.lock:
+            performance = {item["attack_id"]: item for item in self._attack_performance()}
+            rows = []
+            for attack in catalog():
+                attack.update({
+                    "samples": performance[attack["id"]]["samples"],
+                    "detection_rate": performance[attack["id"]]["detection_rate"],
+                    "mean_risk": performance[attack["id"]]["mean_risk"],
+                })
+                rows.append(attack)
+            return rows
 
     def transactions(self, limit: int = 100) -> list[dict]:
         with self.lock:
@@ -146,6 +162,9 @@ class DefenseEngine:
     def simulate(self, attack_ids: list[str], count: int = 80, intensity: float = 1.0) -> dict:
         with self.lock:
             valid_ids = [attack_id for attack_id in attack_ids if attack_id in ATTACK_BY_ID]
+            invalid_ids = [attack_id for attack_id in attack_ids if attack_id not in ATTACK_BY_ID]
+            if invalid_ids:
+                raise ValueError(f"Unknown attack IDs: {', '.join(invalid_ids)}")
             count = max(5, min(int(count), 500))
             intensity = max(0.35, min(float(intensity), 1.4))
             rows = self.generator.generate_attacks(count, valid_ids or None, intensity)
@@ -187,10 +206,11 @@ class DefenseEngine:
             random.Random(self.seed + self.cycle).shuffle(self.training_rows)
             calibration = self.generator.generate_mixed(850, attack_rate=0.27, intensity=1.0)
             evaluation = self.generator.generate_mixed(1250, attack_rate=0.25, intensity=1.04)
-            previous = dict(self.metrics)
+            previous = self.detector.evaluate(evaluation)
             self.detector.fit(self.training_rows)
             self.detector.calibrate(calibration)
             self.metrics = self.detector.evaluate(evaluation)
+            self.holdout_rows = list(evaluation)
             self.cycle += 1
             self.history.append(self._history_point("Feedback retrain", self.metrics, evaluation))
             self.feedback_rows.clear()
@@ -216,4 +236,3 @@ class DefenseEngine:
     def score_transaction(self, transaction: dict) -> dict:
         with self.lock:
             return self.detector.score_and_annotate(transaction)
-

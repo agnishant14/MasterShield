@@ -40,6 +40,15 @@ class GeneratorTests(unittest.TestCase):
         self.assertGreater(sum(row["prompt_pressure_score"] for row in rows) / len(rows), 0.6)
         self.assertGreater(sum(row["graph_mule_score"] for row in rows) / len(rows), 0.4)
 
+    def test_scenario_overlays_match_catalog_recipes(self) -> None:
+        generator = SyntheticGenerator(12)
+        otp = generator.generate_attacks(12, ["atk-009"])
+        fallback = generator.generate_attacks(12, ["atk-016"])
+        supplier = generator.generate_attacks(12, ["atk-022"])
+        self.assertTrue(all(row["remote_access"] == 1 for row in otp))
+        self.assertTrue(all(row["auth_downgrade"] == 1 for row in fallback))
+        self.assertGreater(sum(row["merchant_age_risk"] for row in supplier) / len(supplier), 0.4)
+
     def test_feature_vector_is_complete(self) -> None:
         row = SyntheticGenerator(3).generate_legitimate(1)[0]
         values = vectorize(row)
@@ -73,6 +82,12 @@ class ClosedLoopTests(unittest.TestCase):
         result = self.engine.retrain()
         self.assertEqual(previous_cycle + 1, result["cycle"])
         self.assertEqual(0, len(self.engine.feedback_rows))
+
+    def test_holdout_is_not_reused_for_bootstrap_training(self) -> None:
+        training_ids = {row["id"] for row in self.engine.training_rows}
+        holdout_ids = {row["id"] for row in self.engine.holdout_rows}
+        self.assertTrue(training_ids.isdisjoint(holdout_ids))
+        self.assertEqual(len(self.engine.holdout_rows), sum(self.engine.overview()["validation"]["risk_distribution"]["legitimate"]) + sum(self.engine.overview()["validation"]["risk_distribution"]["attack"]))
 
 
 class WebArtifactTests(unittest.TestCase):
