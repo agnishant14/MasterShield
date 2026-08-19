@@ -257,6 +257,7 @@ tbody tr:hover { background: #fbfaf8; }
 .primary-button { height: 43px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 4px; background: var(--red); color: #fff; padding: 0 18px; font-size: 10px; font-weight: 800; cursor: pointer; }
 .primary-button:hover { background: #d92a20; }
 .primary-button:disabled { opacity: .58; cursor: wait; }
+button[data-api-unavailable="true"] { opacity: .5; cursor: not-allowed; }
 .primary-button svg { width: 15px; height: 15px; }
 .sim-builder > .primary-button { width: calc(100% - 40px); margin: 0 20px; }
 .button-arrow { margin-left: auto; font-size: 14px; }

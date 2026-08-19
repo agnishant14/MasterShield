@@ -164,6 +164,26 @@ class ClosedLoopTests(unittest.TestCase):
         self.engine.simulate(["atk-001"], count=5)
         self.engine.retrain()
         self.assertEqual(original_ids, {row["id"] for row in self.engine.immutable_holdout_rows})
+        self.assertEqual(self.engine.detector.evaluate(self.engine.immutable_holdout_rows), self.engine.metrics)
+
+    def test_fidelity_is_reproducible_without_advancing_live_generator(self) -> None:
+        engine = DefenseEngine(seed=2040)
+        before = (engine.generator.rng.getstate(), engine.generator._clock, engine.generator._counter)
+        first = engine.fidelity()
+        after = (engine.generator.rng.getstate(), engine.generator._clock, engine.generator._counter)
+        second = engine.fidelity()
+        self.assertEqual(before, after)
+        self.assertEqual(first, second)
+
+    def test_latency_uses_nearest_rank_p95(self) -> None:
+        engine = DefenseEngine(seed=2041)
+        engine.latencies_ms = [float(value) for value in range(1, 21)]
+        self.assertEqual(19.0, engine._p95_latency())
+
+    def test_retrain_reports_measured_duration(self) -> None:
+        engine = DefenseEngine(seed=2042)
+        result = engine.retrain()
+        self.assertGreater(result["duration_ms"], 0)
 
     def test_feedback_buckets_and_mutation_search(self) -> None:
         run = self.engine.simulate(["atk-001"], count=5)
@@ -184,12 +204,14 @@ class WebArtifactTests(unittest.TestCase):
             self.assertIn(view, html)
         self.assertIn("independent challenge prototype", html.lower())
         self.assertIn("run-mutation", html)
+        self.assertIn("/favicon.svg", html)
+        self.assertNotIn("/_vercel/insights/script.js", html)
 
     def test_offline_demo_supports_new_read_only_views(self) -> None:
         script = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
         for endpoint in ("/api/health", "/api/fidelity", "/api/report", "/api/mutate"):
             self.assertIn(f'url === "{endpoint}"', script)
-        self.assertIn('setConnectionStatus(isOfflineDemo() ? "offline" : "live")', script)
+        self.assertIn('setConnectionStatus(isOfflineDemo() ? "offline" : currentBackend ? "live" : "outdated")', script)
 
     def test_vercel_wsgi_entrypoint_serves_health_and_console(self) -> None:
         def request(path: str, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], bytes]:
@@ -212,7 +234,26 @@ class WebArtifactTests(unittest.TestCase):
         status, headers, body = request("/api/health")
         self.assertEqual("200 OK", status)
         self.assertEqual("application/json; charset=utf-8", headers["Content-Type"])
-        self.assertEqual("ok", json.loads(body)["status"])
+        health = json.loads(body)
+        self.assertEqual("ok", health["status"])
+        self.assertIn("fidelity", health["capabilities"])
+        self.assertIn("mutate", health["capabilities"])
+        self.assertTrue(health["api_version"])
+
+        for path in ("/api/fidelity", "/api/fidelity/"):
+            status, headers, body = request(path)
+            self.assertEqual("200 OK", status)
+            self.assertTrue(json.loads(body)["synthetic_evidence"])
+
+        for path in ("/api/mutate", "/api/mutate/"):
+            status, headers, body = request(path, "POST", json.dumps({"attack_id": "atk-001", "count": 2}).encode())
+            self.assertEqual("200 OK", status)
+            self.assertEqual(2, json.loads(body)["candidate_count"])
+
+        for path in ("/api/simulations", "/api/simulations/"):
+            status, headers, body = request(path)
+            self.assertEqual("200 OK", status)
+            self.assertIsInstance(json.loads(body)["simulations"], list)
 
         status, headers, body = request("/api/score", "POST", b"{}")
         self.assertEqual("400 Bad Request", status)

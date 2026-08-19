@@ -21,6 +21,36 @@ from sentinel import DefenseEngine
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
 ENGINE = DefenseEngine()
+API_VERSION = "2026-08-19.1"
+API_CAPABILITIES = (
+    "overview",
+    "attacks",
+    "transactions",
+    "simulate",
+    "retrain",
+    "score",
+    "fidelity",
+    "mutate",
+    "feedback",
+    "simulations",
+    "report",
+)
+
+
+def _normalize_path(path: str | None) -> str:
+    return (path or "/").rstrip("/") or "/"
+
+
+def _health_payload(request_id: str | None = None) -> dict:
+    payload = {
+        "status": "ok",
+        "api_version": API_VERSION,
+        "capabilities": list(API_CAPABILITIES),
+        "model_version": f"hybrid-logit-c{ENGINE.cycle}",
+    }
+    if request_id:
+        payload["request_id"] = request_id
+    return payload
 
 
 def _validate_simulate_payload(payload: dict) -> None:
@@ -60,6 +90,8 @@ def _parse_json_object(raw: bytes) -> dict:
 
 
 def _json_response(payload: object, status: int = HTTPStatus.OK, request_id: str | None = None) -> tuple[int, list[tuple[str, str]], bytes]:
+    if request_id and isinstance(payload, dict) and "request_id" not in payload:
+        payload = {**payload, "request_id": request_id}
     body = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     headers = [
         ("Content-Type", "application/json; charset=utf-8"),
@@ -112,13 +144,13 @@ def _read_wsgi_body(environ: dict) -> dict:
 def _dispatch_wsgi(environ: dict) -> tuple[int, list[tuple[str, str]], bytes]:
     """Dispatch a Vercel WSGI request using the same engine as the local server."""
     method = environ.get("REQUEST_METHOD", "GET").upper()
-    path = environ.get("PATH_INFO") or "/"
+    path = _normalize_path(environ.get("PATH_INFO"))
     query = parse_qs(environ.get("QUERY_STRING", ""), keep_blank_values=True)
     request_id = environ.get("HTTP_X_REQUEST_ID") or str(uuid.uuid4())
     try:
         if method == "GET":
             if path == "/api/health":
-                return _json_response({"status": "ok", "model_version": f"hybrid-logit-c{ENGINE.cycle}", "request_id": request_id}, request_id=request_id)
+                return _json_response(_health_payload(request_id), request_id=request_id)
             if path == "/api/overview":
                 return _json_response(ENGINE.overview(), request_id=request_id)
             if path == "/api/attacks":
@@ -134,7 +166,7 @@ def _dispatch_wsgi(environ: dict) -> tuple[int, list[tuple[str, str]], bytes]:
             if path == "/api/report":
                 return _json_response(ENGINE.report(), request_id=request_id)
             if path == "/api/simulations":
-                return _json_response({"simulations": ENGINE.simulation_history}, request_id=request_id)
+                return _json_response({"simulations": ENGINE.simulations()}, request_id=request_id)
             if path == "/api/feedback":
                 return _json_response({"feedback": ENGINE.store.list("feedback")}, request_id=request_id)
             if path.startswith("/api/"):
@@ -168,7 +200,7 @@ def _dispatch_wsgi(environ: dict) -> tuple[int, list[tuple[str, str]], bytes]:
         if method == "HEAD":
             status, headers, body = _dispatch_wsgi({**environ, "REQUEST_METHOD": "GET"})
             return status, headers, b""
-        return _json_response({"error": "Method not allowed"}, HTTPStatus.METHOD_NOT_ALLOWED)
+        return _json_response({"error": "Method not allowed"}, HTTPStatus.METHOD_NOT_ALLOWED, request_id)
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         return _json_response({"error": str(exc), "request_id": request_id}, HTTPStatus.BAD_REQUEST, request_id)
     except Exception as exc:  # pragma: no cover - top-level guard for serverless resilience
@@ -190,6 +222,8 @@ class AppHandler(BaseHTTPRequestHandler):
     server_version = "MasterShield/1.0"
 
     def _json(self, payload: object, status: int = 200) -> None:
+        if isinstance(payload, dict) and "request_id" not in payload:
+            payload = {**payload, "request_id": getattr(self, "request_id", str(uuid.uuid4()))}
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -237,32 +271,33 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        path = _normalize_path(parsed.path)
         self.request_id = self.headers.get("X-Request-ID") or str(uuid.uuid4())
         try:
-            if parsed.path == "/api/health":
-                self._json({"status": "ok", "model_version": f"hybrid-logit-c{ENGINE.cycle}"})
-            elif parsed.path == "/api/overview":
+            if path == "/api/health":
+                self._json(_health_payload(self.request_id))
+            elif path == "/api/overview":
                 self._json(ENGINE.overview())
-            elif parsed.path == "/api/attacks":
+            elif path == "/api/attacks":
                 self._json({"attacks": ENGINE.attacks()})
-            elif parsed.path == "/api/transactions":
+            elif path == "/api/transactions":
                 try:
                     limit = int(parse_qs(parsed.query).get("limit", ["100"])[0])
                 except ValueError as exc:
                     raise ValueError("limit must be an integer") from exc
                 self._json({"transactions": ENGINE.transactions(limit)})
-            elif parsed.path == "/api/fidelity":
+            elif path == "/api/fidelity":
                 self._json(ENGINE.fidelity())
-            elif parsed.path == "/api/report":
+            elif path == "/api/report":
                 self._json(ENGINE.report())
-            elif parsed.path == "/api/simulations":
-                self._json({"simulations": ENGINE.simulation_history})
-            elif parsed.path == "/api/feedback":
+            elif path == "/api/simulations":
+                self._json({"simulations": ENGINE.simulations()})
+            elif path == "/api/feedback":
                 self._json({"feedback": ENGINE.store.list("feedback")})
-            elif parsed.path.startswith("/api/"):
+            elif path.startswith("/api/"):
                 self._json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
             else:
-                self._static(parsed.path if parsed.path != "/" else "/index.html")
+                self._static(path if path != "/" else "/index.html")
         except (ValueError, TypeError) as exc:
             self._json({"error": str(exc), "request_id": self.request_id}, HTTPStatus.BAD_REQUEST)
         except Exception as exc:  # pragma: no cover - top-level guard for prototype resilience
@@ -270,10 +305,11 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        path = _normalize_path(parsed.path)
         self.request_id = self.headers.get("X-Request-ID") or str(uuid.uuid4())
         try:
             payload = self._body()
-            if parsed.path == "/api/simulate":
+            if path == "/api/simulate":
                 _validate_simulate_payload(payload)
                 result = ENGINE.simulate(
                     payload.get("attack_ids") or [],
@@ -281,14 +317,14 @@ class AppHandler(BaseHTTPRequestHandler):
                     payload.get("intensity", 1.0),
                 )
                 self._json(result, HTTPStatus.CREATED)
-            elif parsed.path == "/api/retrain":
+            elif path == "/api/retrain":
                 self._json(ENGINE.retrain())
-            elif parsed.path == "/api/mutate":
+            elif path == "/api/mutate":
                 _validate_mutate_payload(payload)
                 self._json(ENGINE.mutate_transaction(payload.get("transaction_id"), payload.get("attack_id"), payload.get("count", 24)))
-            elif parsed.path == "/api/score":
+            elif path == "/api/score":
                 self._json(ENGINE.score_transaction(payload))
-            elif parsed.path == "/api/feedback":
+            elif path == "/api/feedback":
                 if not isinstance(payload.get("transaction_id"), str) or not isinstance(payload.get("outcome"), str):
                     raise ValueError("transaction_id and outcome are required strings")
                 self._json(ENGINE.submit_feedback(payload["transaction_id"], payload["outcome"], payload.get("note", "")), HTTPStatus.CREATED)

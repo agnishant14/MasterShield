@@ -54,18 +54,34 @@ def classification_metrics(labels: list[int], scores: list[float], threshold: fl
 
 
 def precision_recall_auc(labels: list[int], scores: list[float]) -> float:
-    """Trapezoidal area under the precision-recall curve."""
-    points = []
-    for threshold in sorted(set(scores), reverse=True):
-        predicted = [int(score >= threshold) for score in scores]
-        tp = sum(label == 1 and pred == 1 for label, pred in zip(labels, predicted))
-        fp = sum(label == 0 and pred == 1 for label, pred in zip(labels, predicted))
-        fn = sum(label == 1 and pred == 0 for label, pred in zip(labels, predicted))
-        precision = tp / max(1, tp + fp)
-        recall = tp / max(1, tp + fn)
+    """Compute trapezoidal PR-AUC in O(n log n) over ranked scores.
+
+    The previous implementation rebuilt a prediction vector for every distinct
+    threshold, which made retrain validation quadratic in the holdout size.
+    Equal-score rows are evaluated as one threshold step, preserving the curve
+    semantics while keeping the endpoint responsive on ordinary hardware.
+    """
+    if not labels or len(labels) != len(scores) or not any(labels):
+        return 0.0
+    positives = sum(labels)
+    ranked = sorted(zip(scores, labels), key=lambda item: item[0], reverse=True)
+    points = [(0.0, 1.0)]
+    true_positives = false_positives = 0
+    index = 0
+    while index < len(ranked):
+        threshold = ranked[index][0]
+        end = index
+        while end < len(ranked) and ranked[end][0] == threshold:
+            if ranked[end][1]:
+                true_positives += 1
+            else:
+                false_positives += 1
+            end += 1
+        recall = true_positives / positives
+        precision = true_positives / max(1, true_positives + false_positives)
         points.append((recall, precision))
-    points.sort()
-    return sum((right[0] - left[0]) * (left[1] + right[1]) / 2 for left, right in zip(points, points[1:])) if len(points) > 1 else 0.0
+        index = end
+    return round(sum((right[0] - left[0]) * (left[1] + right[1]) / 2 for left, right in zip(points, points[1:])), 8)
 
 
 def recall_at_false_positive_rate(labels: list[int], scores: list[float], max_fpr: float) -> float:

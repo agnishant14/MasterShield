@@ -7,9 +7,25 @@ const state = {
   feedbackQueued: 0,
   transactionIndex: new Map(),
   connectionMode: "loading",
+  capabilities: null,
   fidelity: null,
   mutation: null,
 };
+
+const API_CONTROLS = {
+  "refresh-overview": "overview",
+  "run-simulation": "simulate",
+  "retrain-button": "retrain",
+  "refresh-fidelity": "fidelity",
+  "export-report": "report",
+  "run-mutation": "mutate",
+};
+
+const OUTDATED_BACKEND_MESSAGE = "Backend API is outdated; redeploy the current app.py.";
+const OFFLINE_ACTION_MESSAGE = "Interactive actions require the Python server; run python3 app.py.";
+const REQUIRED_UI_CAPABILITIES = ["overview", "attacks", "simulate", "retrain", "fidelity", "report", "mutate", "feedback"];
+const OFFLINE_CAPABILITIES = ["overview", "attacks", "transactions", "fidelity", "report", "mutate", "simulations"];
+const REQUEST_TIMEOUTS_MS = { "/api/retrain": 60000, "/api/fidelity": 60000, "/api/report": 60000, "/api/mutate": 30000 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -50,7 +66,7 @@ function isOfflineDemo() {
 async function requestJSON(url, options = {}) {
   if (isOfflineDemo()) {
     const demo = window.MASTERSHIELD_DEMO;
-    if (url === "/api/health") return { status: "offline", model_version: `hybrid-logit-c${demo.overview.cycle}` };
+    if (url === "/api/health") return { status: "offline", api_version: "offline-demo", capabilities: OFFLINE_CAPABILITIES, model_version: `hybrid-logit-c${demo.overview.cycle}` };
     if (url === "/api/overview") return structuredClone(demo.overview);
     if (url === "/api/attacks") return { attacks: structuredClone(demo.attacks) };
     if (url === "/api/transactions") return { transactions: structuredClone(demo.overview.recent_transactions || []) };
@@ -109,15 +125,31 @@ async function requestJSON(url, options = {}) {
     throw new Error("Interactive runs require python3 app.py");
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUTS_MS[url] || 15000);
   try {
     const response = await fetch(url, {
       headers: { "Content-Type": "application/json", ...(options.headers || {}) },
       ...options,
       signal: controller.signal,
     });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || `Request failed: ${response.status}`);
+    const contentType = response.headers.get("content-type") || "";
+    const rawBody = await response.text();
+    let payload = {};
+    if (rawBody) {
+      try {
+        payload = JSON.parse(rawBody);
+      } catch (_error) {
+        if (!response.ok) throw new Error(`Server returned HTTP ${response.status} with a non-JSON response`);
+        throw new Error(`Server returned ${contentType || "an unknown content type"}; expected JSON`);
+      }
+    }
+    if (!response.ok) {
+      const requestPath = new URL(url, window.location.href).pathname.replace(/\/$/, "");
+      if (response.status === 404 && ["/api/fidelity", "/api/mutate", "/api/report"].includes(requestPath)) {
+        throw new Error(OUTDATED_BACKEND_MESSAGE);
+      }
+      throw new Error(payload.error || `Request failed: ${response.status}`);
+    }
     return payload;
   } catch (error) {
     if (error.name === "AbortError") throw new Error("The server took too long to respond");
@@ -140,10 +172,32 @@ function setConnectionStatus(mode) {
   const status = $("#connection-status");
   if (!status) return;
   status.dataset.mode = mode;
-  $("#connection-label").textContent = { loading: "Connecting", live: "Live API", offline: "Offline demo", error: "Unavailable" }[mode];
-  $("#model-status-label").textContent = { loading: "LOADING", live: "LIVE API", offline: "OFFLINE SNAPSHOT", error: "UNAVAILABLE" }[mode];
-  $("#side-loop-title").innerHTML = `<span class="pulse"></span> ${mode === "live" ? "Closed loop active" : mode === "offline" ? "Static evidence snapshot" : mode === "error" ? "Defense loop unavailable" : "Connecting to model"}`;
-  $("#side-loop-copy").textContent = mode === "live" ? "Simulation feedback is available for the next model cycle." : mode === "offline" ? "Start app.py to run simulations and retraining." : "Loading red-team, model, and feedback state.";
+  $("#connection-label").textContent = { loading: "Connecting", live: "Live API", offline: "Offline demo", outdated: "Update required", error: "Unavailable" }[mode];
+  $("#model-status-label").textContent = { loading: "LOADING", live: "LIVE API", offline: "OFFLINE SNAPSHOT", outdated: "OUTDATED API", error: "UNAVAILABLE" }[mode];
+  $("#side-loop-title").innerHTML = `<span class="pulse"></span> ${mode === "live" ? "Closed loop active" : mode === "offline" ? "Static evidence snapshot" : mode === "outdated" ? "Backend update required" : mode === "error" ? "Defense loop unavailable" : "Connecting to model"}`;
+  $("#side-loop-copy").textContent = mode === "live" ? "Simulation feedback is available for the next model cycle." : mode === "offline" ? "Start app.py to run simulations and retraining." : mode === "outdated" ? "Redeploy the current app.py to enable all API-backed controls." : "Loading red-team, model, and feedback state.";
+}
+
+function updateCapabilities(health) {
+  state.capabilities = new Set(Array.isArray(health?.capabilities) ? health.capabilities : []);
+  const currentBackend = REQUIRED_UI_CAPABILITIES.every((capability) => state.capabilities.has(capability));
+  const unavailableMessage = isOfflineDemo() ? OFFLINE_ACTION_MESSAGE : OUTDATED_BACKEND_MESSAGE;
+  Object.entries(API_CONTROLS).forEach(([id, capability]) => {
+    const button = $(`#${id}`);
+    if (!button) return;
+    const supported = state.capabilities.has(capability);
+    button.disabled = !supported;
+    button.dataset.apiUnavailable = String(!supported);
+    if (!supported) button.title = unavailableMessage;
+    else if ([OUTDATED_BACKEND_MESSAGE, OFFLINE_ACTION_MESSAGE].includes(button.title)) button.removeAttribute("title");
+  });
+  return currentBackend;
+}
+
+function requireCapability(capability) {
+  if (state.capabilities?.has(capability)) return true;
+  toast(isOfflineDemo() ? OFFLINE_ACTION_MESSAGE : OUTDATED_BACKEND_MESSAGE);
+  return false;
 }
 
 function switchView(viewName) {
@@ -406,15 +460,21 @@ function openTransactionDialog(transactionId) {
     <section class="detail-section"><span>RECOMMENDED ACTION</span><p>${row.decision === "approve" ? "Approve and continue monitoring." : row.decision === "decline" ? "Decline and retain the model reasons for review." : "Step up or route to analyst review before authorization."}</p></section>
     <section class="detail-section"><span>ANALYST OUTCOME</span><div class="segmented feedback-actions"><button data-feedback-outcome="confirmed_fraud" type="button">CONFIRMED FRAUD</button><button data-feedback-outcome="confirmed_legitimate" type="button">LEGITIMATE</button><button data-feedback-outcome="uncertain" type="button">UNCERTAIN</button></div></section>`;
   $("#transaction-dialog").showModal();
-  $$('[data-feedback-outcome]', $("#transaction-dialog-content")).forEach((button) => button.addEventListener("click", async () => {
-    try {
-      await requestJSON("/api/feedback", { method: "POST", body: JSON.stringify({ transaction_id: row.id, outcome: button.dataset.feedbackOutcome }) });
-      toast(`Analyst outcome recorded for ${row.id}.`);
-      button.parentElement.querySelectorAll("button").forEach((item) => item.disabled = true);
-    } catch (error) {
-      toast(`Feedback failed: ${error.message}`);
-    }
-  }));
+  $$('[data-feedback-outcome]', $("#transaction-dialog-content")).forEach((button) => {
+    const feedbackAvailable = state.capabilities?.has("feedback");
+    button.disabled = !feedbackAvailable;
+    if (!feedbackAvailable) button.title = isOfflineDemo() ? OFFLINE_ACTION_MESSAGE : OUTDATED_BACKEND_MESSAGE;
+    button.addEventListener("click", async () => {
+      if (!requireCapability("feedback")) return;
+      try {
+        await requestJSON("/api/feedback", { method: "POST", body: JSON.stringify({ transaction_id: row.id, outcome: button.dataset.feedbackOutcome }) });
+        toast(`Analyst outcome recorded for ${row.id}.`);
+        button.parentElement.querySelectorAll("button").forEach((item) => item.disabled = true);
+      } catch (error) {
+        toast(`Feedback failed: ${error.message}`);
+      }
+    });
+  });
   refreshIcons();
 }
 
@@ -445,17 +505,20 @@ function renderDefense() {
 async function loadData() {
   setConnectionStatus("loading");
   try {
-    const [overview, attackPayload] = await Promise.all([
+    const [health, overview, attackPayload] = await Promise.all([
+      requestJSON("/api/health"),
       requestJSON("/api/overview"),
       requestJSON("/api/attacks"),
     ]);
     state.overview = overview;
     state.attacks = attackPayload.attacks;
     state.feedbackQueued = Number(overview.feedback_queue_size || 0);
-    setConnectionStatus(isOfflineDemo() ? "offline" : "live");
+    const currentBackend = updateCapabilities(health);
+    setConnectionStatus(isOfflineDemo() ? "offline" : currentBackend ? "live" : "outdated");
     renderOverview();
     renderAttackTable();
     renderScenarioPicker();
+    if (!currentBackend && !isOfflineDemo()) toast(OUTDATED_BACKEND_MESSAGE);
   } catch (error) {
     setConnectionStatus("error");
     toast(`Could not load the defense lab: ${error.message}`);
@@ -463,6 +526,7 @@ async function loadData() {
 }
 
 async function loadFidelity() {
+  if (!requireCapability("fidelity")) return;
   try {
     const result = await requestJSON("/api/fidelity");
     renderFidelity(result);
@@ -472,6 +536,7 @@ async function loadFidelity() {
 }
 
 async function exportReport() {
+  if (!requireCapability("report")) return;
   try {
     const report = await requestJSON("/api/report");
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
@@ -487,6 +552,7 @@ async function exportReport() {
 }
 
 async function runMutation() {
+  if (!requireCapability("mutate")) return;
   const button = $("#run-mutation");
   const oldHTML = button.innerHTML;
   button.disabled = true;
@@ -515,6 +581,7 @@ async function refreshData() {
 }
 
 async function runSimulation() {
+  if (!requireCapability("simulate")) return;
   if (!state.selectedAttacks.size) {
     toast("Select at least one attack hypothesis.");
     return;
@@ -545,6 +612,7 @@ async function runSimulation() {
 }
 
 async function retrainModel() {
+  if (!requireCapability("retrain")) return;
   const button = $("#retrain-button");
   const oldHTML = button.innerHTML;
   button.disabled = true;
@@ -555,7 +623,8 @@ async function retrainModel() {
     $("#simulation-queue").textContent = "0";
     await refreshData();
     const f1Delta = result.deltas.f1;
-    toast(`Cycle ${result.cycle} trained on ${result.feedback_rows} feedback rows. F1 ${f1Delta >= 0 ? "+" : ""}${pct(f1Delta)}.`);
+    const duration = Number(result.duration_ms || 0);
+    toast(`Cycle ${result.cycle} trained on ${result.feedback_rows} feedback rows in ${(duration / 1000).toFixed(1)}s. F1 ${f1Delta >= 0 ? "+" : ""}${pct(f1Delta)}.`);
   } catch (error) {
     toast(`Retraining failed: ${error.message}`);
   } finally {
@@ -616,5 +685,8 @@ document.addEventListener("DOMContentLoaded", () => {
   refreshIcons();
   bindEvents();
   loadData();
-  setInterval(() => requestJSON("/api/health").then(() => setConnectionStatus(isOfflineDemo() ? "offline" : "live")).catch(() => setConnectionStatus("error")), 30000);
+  setInterval(() => requestJSON("/api/health").then((health) => {
+    const currentBackend = updateCapabilities(health);
+    setConnectionStatus(isOfflineDemo() ? "offline" : currentBackend ? "live" : "outdated");
+  }).catch(() => setConnectionStatus("error")), 30000);
 });

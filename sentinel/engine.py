@@ -7,6 +7,7 @@ import threading
 import os
 import time
 import math
+import hashlib
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
@@ -184,6 +185,11 @@ class DefenseEngine:
             limit = max(0, min(int(limit), 500))
             return list(reversed(self.live_transactions[-limit:])) if limit else []
 
+    def simulations(self, limit: int = 100) -> list[dict]:
+        with self.lock:
+            limit = max(0, min(int(limit), 500))
+            return list(reversed(self.simulation_history[-limit:])) if limit else []
+
     def simulate(self, attack_ids: list[str], count: int = 80, intensity: float = 1.0) -> dict:
         with self.lock:
             valid_ids = [attack_id for attack_id in attack_ids if attack_id in ATTACK_BY_ID]
@@ -233,6 +239,7 @@ class DefenseEngine:
 
     def retrain(self) -> dict:
         with self.lock:
+            started = time.perf_counter()
             feedback = list(self.feedback_rows)
             if not feedback:
                 feedback = self.generator.generate_attacks(180, intensity=1.08)
@@ -245,15 +252,16 @@ class DefenseEngine:
             random.Random(self.seed + self.cycle).shuffle(self.training_rows)
             calibration = self.generator.generate_mixed(850, attack_rate=0.27, intensity=1.0)
             evaluation = self.generator.generate_mixed(1250, attack_rate=0.25, intensity=1.04)
-            previous = self.detector.evaluate(evaluation)
+            previous = self.detector.evaluate(self.immutable_holdout_rows)
             self.detector.fit(self.training_rows)
             self.detector.calibrate(calibration)
-            self.metrics = self.detector.evaluate(evaluation)
             self.rolling_validation_rows = list(evaluation)
+            rolling_metrics = self.detector.evaluate(self.rolling_validation_rows)
+            self.metrics = self.detector.evaluate(self.immutable_holdout_rows)
             self.cycle += 1
-            self.history.append(self._history_point("Feedback retrain", self.metrics, evaluation))
+            self.history.append(self._history_point("Feedback retrain", self.metrics, self.immutable_holdout_rows))
             self.validation_reports = self._validation_report()
-            self.store.append("models", {"cycle": self.cycle, "metrics": self.metrics, "training_rows": len(self.training_rows)})
+            self.store.append("models", {"cycle": self.cycle, "metrics": self.metrics, "rolling_metrics": rolling_metrics, "training_rows": len(self.training_rows)})
             self.store.append("audit", {"event": "retrain", "cycle": self.cycle, "feedback_rows": len(feedback)})
             self.feedback_rows.clear()
             self.feedback_records.clear()
@@ -261,10 +269,12 @@ class DefenseEngine:
             self.live_transactions = [self.detector.score_and_annotate(row) for row in self.live_transactions]
             return {
                 "cycle": self.cycle,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "feedback_rows": len(feedback),
                 "hard_cases": len(hard),
                 "previous_metrics": previous,
                 "metrics": self.metrics,
+                "rolling_metrics": rolling_metrics,
                 "deltas": {
                     key: round(self.metrics.get(key, 0) - previous.get(key, 0), 4)
                     for key in ("precision", "recall", "f1", "auc", "false_positive_rate")
@@ -316,10 +326,11 @@ class DefenseEngine:
 
     def fidelity(self) -> dict:
         with self.lock:
-            reference = self.generator.generate_mixed(420, attack_rate=0.22, intensity=0.92)
-            candidate = self.generator.generate_mixed(420, attack_rate=0.22, intensity=1.04)
+            generator = self._evaluation_generator("fidelity")
+            reference = generator.generate_mixed(420, attack_rate=0.22, intensity=0.92)
+            candidate = generator.generate_mixed(420, attack_rate=0.22, intensity=1.04)
             report = compare_streams(reference, candidate)
-            report["robustness"] = robustness_report(self.detector, self.generator, self.seed)
+            report["robustness"] = robustness_report(self.detector, self._evaluation_generator("fidelity-robustness"), self.seed)
             report["policy_tradeoff"] = self.policy.tradeoff(self.immutable_holdout_rows, self.detector)
             return report
 
@@ -365,10 +376,15 @@ class DefenseEngine:
         values = sorted(self.latencies_ms[-1000:])
         if not values:
             return 0.0
-        return round(values[min(len(values) - 1, int(len(values) * 0.95))], 3)
+        return round(values[max(0, math.ceil(len(values) * 0.95) - 1)], 3)
+
+    def _evaluation_generator(self, purpose: str) -> SyntheticGenerator:
+        material = f"{self.seed}:{self.cycle}:{purpose}".encode("utf-8")
+        derived_seed = int.from_bytes(hashlib.sha256(material).digest()[:8], "big")
+        return SyntheticGenerator(derived_seed)
 
     def _validation_report(self, include_robustness: bool = True) -> dict:
-        robust = robustness_report(self.detector, self.generator, self.seed) if include_robustness else {"status": "available via fidelity endpoint"}
+        robust = robustness_report(self.detector, self._evaluation_generator("validation-robustness"), self.seed) if include_robustness else {"status": "available via fidelity endpoint"}
         labels = [int(row.get("label", 0)) for row in self.immutable_holdout_rows]
         hybrid_scores = [self.detector.score(row) for row in self.immutable_holdout_rows]
         logistic_scores = [self.detector.model_score(row) for row in self.immutable_holdout_rows]
