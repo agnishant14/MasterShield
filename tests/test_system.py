@@ -98,6 +98,33 @@ class NewCapabilityTests(unittest.TestCase):
             sqlite_store.append("models", {"cycle": 2})
             self.assertEqual(2, sqlite_store.list("models")[0]["payload"]["cycle"])
 
+    def test_feedback_and_mutation_targets_are_retrainable_and_explicit(self) -> None:
+        engine = DefenseEngine(seed=2030)
+        transaction = engine.generator.generate_attacks(1, ["atk-001"])[0]
+        transaction.pop("id")
+        scored = engine.score_transaction(transaction)
+        self.assertRegex(scored["id"], r"^score-\d+-\d{6}$")
+        self.assertTrue(any(row.get("id") == scored["id"] for row in engine.live_transactions))
+
+        fraud_feedback = engine.submit_feedback(scored["id"], "confirmed_fraud")
+        self.assertTrue(fraud_feedback["queued_for_retraining"])
+        self.assertEqual(1, engine.feedback_rows[-1]["label"])
+
+        legitimate = next(row for row in engine.live_transactions if row.get("label") == 0)
+        legitimate_feedback = engine.submit_feedback(legitimate["id"], "confirmed_legitimate")
+        self.assertTrue(legitimate_feedback["queued_for_retraining"])
+        self.assertEqual(0, engine.feedback_rows[-1]["label"])
+
+        uncertain_feedback = engine.submit_feedback(legitimate["id"], "uncertain")
+        self.assertFalse(uncertain_feedback["queued_for_retraining"])
+        self.assertEqual(2, len(engine.feedback_rows))
+        self.assertEqual(2, engine.retrain()["feedback_rows"])
+
+        with self.assertRaisesRegex(ValueError, "Unknown attack ID"):
+            engine.mutate_transaction(attack_id="not-an-attack", count=1)
+        with self.assertRaisesRegex(ValueError, "Transaction not found"):
+            engine.mutate_transaction(transaction_id="not-a-transaction", count=1)
+
 
 class ClosedLoopTests(unittest.TestCase):
     @classmethod
@@ -158,6 +185,12 @@ class WebArtifactTests(unittest.TestCase):
         self.assertIn("independent challenge prototype", html.lower())
         self.assertIn("run-mutation", html)
 
+    def test_offline_demo_supports_new_read_only_views(self) -> None:
+        script = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+        for endpoint in ("/api/health", "/api/fidelity", "/api/report", "/api/mutate"):
+            self.assertIn(f'url === "{endpoint}"', script)
+        self.assertIn('setConnectionStatus(isOfflineDemo() ? "offline" : "live")', script)
+
     def test_vercel_wsgi_entrypoint_serves_health_and_console(self) -> None:
         def request(path: str, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], bytes]:
             captured: dict[str, object] = {}
@@ -188,6 +221,10 @@ class WebArtifactTests(unittest.TestCase):
         status, headers, body = request("/api/simulate", "POST", json.dumps({"attack_ids": "atk-001"}).encode())
         self.assertEqual("400 Bad Request", status)
         self.assertIn("list of strings", json.loads(body)["error"])
+
+        status, headers, body = request("/api/mutate", "POST", json.dumps({"attack_id": "not-an-attack"}).encode())
+        self.assertEqual("400 Bad Request", status)
+        self.assertIn("Unknown attack ID", json.loads(body)["error"])
 
         status, headers, body = request("/")
         self.assertEqual("200 OK", status)

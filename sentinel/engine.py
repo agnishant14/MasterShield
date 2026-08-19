@@ -43,6 +43,7 @@ class DefenseEngine:
         self.simulation_history: list[dict] = []
         self.feedback_records: list[dict] = []
         self.latencies_ms: list[float] = []
+        self.score_sequence = 0
         self._bootstrap()
 
     def _bootstrap(self) -> None:
@@ -281,15 +282,30 @@ class DefenseEngine:
             self._validate_transaction(transaction)
             started = time.perf_counter()
             result = self.detector.score_and_annotate(transaction)
+            if not result.get("id"):
+                self.score_sequence += 1
+                result["id"] = f"score-{self.cycle}-{self.score_sequence:06d}"
             result["policy"] = self.policy.decide(result, result["risk_score"]).to_dict()
             self.latencies_ms.append((time.perf_counter() - started) * 1000)
+            existing_index = next((index for index, item in enumerate(self.live_transactions) if item.get("id") == result["id"]), None)
+            if existing_index is None:
+                self.live_transactions.append(result)
+            else:
+                self.live_transactions[existing_index] = result
+            self.live_transactions = self.live_transactions[-500:]
             self.store.append("audit", {"event": "score", "transaction_id": result.get("id"), "decision": result.get("decision")})
             return result
 
     def mutate_transaction(self, transaction_id: str | None = None, attack_id: str | None = None, count: int = 24) -> dict:
         with self.lock:
-            row = next((item for item in reversed(self.live_transactions) if item.get("id") == transaction_id), None) if transaction_id else None
-            if row is None and attack_id:
+            row = None
+            if transaction_id is not None:
+                row = next((item for item in reversed(self.live_transactions) if item.get("id") == transaction_id), None)
+                if row is None:
+                    raise ValueError("Transaction not found")
+            if attack_id is not None and attack_id not in ATTACK_BY_ID:
+                raise ValueError(f"Unknown attack ID: {attack_id}")
+            if row is None and attack_id is not None:
                 generated = self.generator.generate_attacks(1, [attack_id], intensity=0.92)
                 row = self.detector.score_and_annotate(generated[0])
             if row is None:
@@ -315,8 +331,19 @@ class DefenseEngine:
             row = next((item for item in self.live_transactions if item.get("id") == transaction_id), None)
             if row is None:
                 raise ValueError("Transaction not found")
-            feedback = {"transaction_id": transaction_id, "outcome": outcome, "note": str(note)[:500], "row": dict(row)}
+            queued_for_retraining = outcome in {"confirmed_fraud", "confirmed_legitimate"}
+            feedback = {
+                "transaction_id": transaction_id,
+                "outcome": outcome,
+                "note": str(note)[:500],
+                "row": dict(row),
+                "queued_for_retraining": queued_for_retraining,
+            }
             self.feedback_records.append(feedback)
+            if queued_for_retraining:
+                training_row = dict(row)
+                training_row["label"] = int(outcome == "confirmed_fraud")
+                self.feedback_rows.append(training_row)
             self.store.append("feedback", feedback)
             self.store.append("audit", {"event": "feedback", "transaction_id": transaction_id, "outcome": outcome})
             return feedback

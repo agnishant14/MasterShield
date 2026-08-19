@@ -43,10 +43,69 @@ function refreshIcons() {
   if (window.lucide) window.lucide.createIcons({ attrs: { "stroke-width": 1.7 } });
 }
 
+function isOfflineDemo() {
+  return window.location.protocol === "file:" && Boolean(window.MASTERSHIELD_DEMO);
+}
+
 async function requestJSON(url, options = {}) {
-  if (window.location.protocol === "file:" && window.MASTERSHIELD_DEMO) {
-    if (url === "/api/overview") return structuredClone(window.MASTERSHIELD_DEMO.overview);
-    if (url === "/api/attacks") return { attacks: structuredClone(window.MASTERSHIELD_DEMO.attacks) };
+  if (isOfflineDemo()) {
+    const demo = window.MASTERSHIELD_DEMO;
+    if (url === "/api/health") return { status: "offline", model_version: `hybrid-logit-c${demo.overview.cycle}` };
+    if (url === "/api/overview") return structuredClone(demo.overview);
+    if (url === "/api/attacks") return { attacks: structuredClone(demo.attacks) };
+    if (url === "/api/transactions") return { transactions: structuredClone(demo.overview.recent_transactions || []) };
+    if (url === "/api/simulations") return { simulations: [] };
+    if (url === "/api/feedback" && options.method !== "POST") return { feedback: [] };
+    if (url === "/api/fidelity") {
+      const metrics = demo.overview.metrics || {};
+      const recall = Number(metrics.recall || 0);
+      return structuredClone(demo.fidelity || {
+        synthetic_evidence: true,
+        sample_counts: { reference: 0, candidate: 0 },
+        feature_distance: {},
+        mean_feature_distance: 0,
+        scenario_mix_distance: 0,
+        robustness: {
+          known_low_intensity: { rows: 0, attack_rows: 0, attack_recall: recall, mean_risk: recall },
+          unseen_attack_families: { rows: 0, attack_rows: 0, attack_recall: recall, mean_risk: recall },
+          missing_features: { rows: 0, attack_rows: 0, attack_recall: recall, mean_risk: recall },
+          legitimate_baseline: { rows: 0, attack_rows: 0, attack_recall: 0, mean_risk: 0 },
+        },
+        policy_tradeoff: {
+          synthetic_evidence: true,
+          actions: demo.overview.decisions || {},
+          estimated_customer_friction: 0,
+          estimated_expected_loss: 0,
+        },
+      });
+    }
+    if (url === "/api/report") {
+      const fidelity = await requestJSON("/api/fidelity");
+      return structuredClone(demo.report || {
+        synthetic_evidence: true,
+        cycle: demo.overview.cycle,
+        metrics: demo.overview.metrics,
+        validation: demo.overview.validation || {},
+        fidelity,
+        simulations: [],
+        feedback: demo.overview.feedback_buckets || {},
+      });
+    }
+    if (url === "/api/mutate") {
+      const row = (demo.overview.recent_transactions || []).find((item) => item.attack_id) || {};
+      return {
+        original: {
+          id: row.id || "offline-snapshot",
+          attack_id: row.attack_id || null,
+          risk_score: Number(row.risk_score || 0),
+          detected: row.decision !== "approve",
+        },
+        candidate_count: 0,
+        blind_spots: 0,
+        candidates: [],
+        safety: "offline snapshot only; start app.py to run a mutation search",
+      };
+    }
     throw new Error("Interactive runs require python3 app.py");
   }
   const controller = new AbortController();
@@ -393,7 +452,7 @@ async function loadData() {
     state.overview = overview;
     state.attacks = attackPayload.attacks;
     state.feedbackQueued = Number(overview.feedback_queue_size || 0);
-    setConnectionStatus("live");
+    setConnectionStatus(isOfflineDemo() ? "offline" : "live");
     renderOverview();
     renderAttackTable();
     renderScenarioPicker();
@@ -557,5 +616,5 @@ document.addEventListener("DOMContentLoaded", () => {
   refreshIcons();
   bindEvents();
   loadData();
-  setInterval(() => requestJSON("/api/health").then(() => setConnectionStatus("live")).catch(() => setConnectionStatus("error")), 30000);
+  setInterval(() => requestJSON("/api/health").then(() => setConnectionStatus(isOfflineDemo() ? "offline" : "live")).catch(() => setConnectionStatus("error")), 30000);
 });
