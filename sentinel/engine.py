@@ -14,8 +14,10 @@ from datetime import datetime, timezone
 from .generator import SyntheticGenerator, scenario_stats
 from .attacker import AdaptiveAttacker
 from .fidelity import compare_streams, robustness_report
+from .governance import PromotionGates
 from .model import HybridFraudDetector, classification_metrics
 from .policy import RiskPolicy
+from .quality import assess_dataset
 from .storage import EventStore
 from .taxonomy import ATTACKS, ATTACK_BY_ID, catalog
 
@@ -45,6 +47,12 @@ class DefenseEngine:
         self.feedback_records: list[dict] = []
         self.latencies_ms: list[float] = []
         self.score_sequence = 0
+        self.model_versions: list[dict] = []
+        self.model_snapshots: dict[str, dict] = {}
+        self.active_model_version: str | None = None
+        self.previous_model_version: str | None = None
+        self.mutation_history: list[dict] = []
+        self.governance = PromotionGates()
         self._bootstrap()
 
     def _bootstrap(self) -> None:
@@ -83,6 +91,87 @@ class DefenseEngine:
 
         seed_stream = self.generator.generate_mixed(140, attack_rate=0.22, intensity=1.02)
         self.live_transactions = [self.detector.score_and_annotate(row) for row in seed_stream][-140:]
+        version = self._next_model_version()
+        self.active_model_version = version
+        self._register_model({
+            "version": version,
+            "cycle": self.cycle,
+            "status": "ACTIVE",
+            "created_at": self._now(),
+            "dataset_version": self._dataset_version(self.training_rows),
+            "training_rows": len(self.training_rows),
+            "feedback_rows": 0,
+            "duration_ms": 0.0,
+            "immutable_holdout_metrics": self.metrics,
+            "rolling_metrics": {},
+            "robustness": self.validation_reports.get("robustness", {}),
+            "gate_results": {"passed": True, "checks": {"bootstrap": True}},
+            "previous_model_version": None,
+        }, self.detector.export_state())
+
+    @staticmethod
+    def _now() -> str:
+        return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    def _next_model_version(self) -> str:
+        return f"hybrid-logit-c{self.cycle}-v{len(self.model_versions) + 1:03d}"
+
+    @staticmethod
+    def _dataset_version(rows: list[dict]) -> str:
+        digest = hashlib.sha256()
+        for row in sorted(rows, key=lambda item: str(item.get("id", ""))):
+            digest.update(str(row.get("id", "")).encode("utf-8"))
+            digest.update(str(int(row.get("label", 0))).encode("ascii"))
+        return digest.hexdigest()[:16]
+
+    def _register_model(self, metadata: dict, snapshot: dict | None = None) -> dict:
+        item = dict(metadata)
+        item.setdefault("synthetic_evidence", True)
+        self.model_versions.append(item)
+        if snapshot is not None:
+            self.model_snapshots[item["version"]] = snapshot
+        self.store.append("models", item)
+        return item
+
+    def models(self) -> list[dict]:
+        with self.lock:
+            return [dict(item) for item in reversed(self.model_versions)]
+
+    def audit(self, limit: int = 100) -> list[dict]:
+        with self.lock:
+            return self.store.list("audit", limit)
+
+    def rollback_model(self, model_version: str) -> dict:
+        with self.lock:
+            if model_version not in self.model_snapshots:
+                raise ValueError("Model version is unavailable for rollback")
+            metadata = next((item for item in self.model_versions if item.get("version") == model_version), None)
+            if metadata and metadata.get("status") == "REJECTED":
+                raise ValueError("Rejected model versions cannot be rolled back into service")
+            if model_version == self.active_model_version:
+                return {"status": "unchanged", "model_version": model_version, "cycle": self.cycle}
+            previous = self.active_model_version
+            self.detector.load_state(self.model_snapshots[model_version])
+            self.previous_model_version = previous
+            self.active_model_version = model_version
+            for item in self.model_versions:
+                if item["version"] == previous:
+                    item["status"] = "ROLLED_BACK"
+                elif item["version"] == model_version:
+                    item["status"] = "ACTIVE"
+            self.metrics = self.detector.evaluate(self.immutable_holdout_rows)
+            self.validation_reports = self._validation_report(self.detector, include_robustness=False)
+            self.live_transactions = [self.detector.score_and_annotate(row) for row in self.live_transactions]
+            result = {
+                "status": "rolled_back",
+                "model_version": model_version,
+                "previous_model_version": previous,
+                "cycle": self.cycle,
+                "metrics": self.metrics,
+                "synthetic_evidence": True,
+            }
+            self.store.append("audit", {"event": "model_rollback", **result})
+            return result
 
     def _risk_distribution(self, rows: list[dict], bins: int = 10) -> dict:
         distribution = {"legitimate": [0] * bins, "attack": [0] * bins}
@@ -146,6 +235,13 @@ class DefenseEngine:
                 "feedback_queue_size": len(self.feedback_rows),
                 "feedback_buckets": self._feedback_bucket_counts(),
                 "simulation_history": list(self.simulation_history[-10:]),
+                "model_versions": self.models(),
+                "active_model_version": self.active_model_version,
+                "data_quality": {
+                    "training": assess_dataset(self.training_rows, self.immutable_holdout_rows),
+                    "immutable_holdout": assess_dataset(self.immutable_holdout_rows),
+                    "rolling_validation": assess_dataset(self.rolling_validation_rows, self.immutable_holdout_rows) if self.rolling_validation_rows else None,
+                },
                 "policy_tradeoff": self.policy.tradeoff(self.immutable_holdout_rows, self.detector),
                 "decisions": dict(decisions),
                 "attack_mix": [{"name": name, "count": count} for name, count in attack_mix.most_common(7)],
@@ -163,7 +259,7 @@ class DefenseEngine:
                     "detector": "online",
                     "feedback_loop": "armed",
                     "latency_ms_p95": self._p95_latency(),
-                    "model_version": f"hybrid-logit-c{self.cycle}",
+                    "model_version": self.active_model_version or f"hybrid-logit-c{self.cycle}",
                 },
             }
 
@@ -176,6 +272,7 @@ class DefenseEngine:
                     "samples": performance[attack["id"]]["samples"],
                     "detection_rate": performance[attack["id"]]["detection_rate"],
                     "mean_risk": performance[attack["id"]]["mean_risk"],
+                    "last_evaluated_model_version": self.active_model_version,
                 })
                 rows.append(attack)
             return rows
@@ -237,55 +334,111 @@ class DefenseEngine:
             self.store.append("audit", {"event": "simulation", "run_id": result["run_id"], "cycle": self.cycle})
             return result
 
-    def retrain(self) -> dict:
+    def retrain(self, confirm: bool = False) -> dict:
         with self.lock:
             started = time.perf_counter()
-            feedback = list(self.feedback_rows)
+            queued = list(self.feedback_rows)
+            queued_ids = {str(row.get("id")) for row in queued if row.get("id")}
+            # Analyst-confirmed outcomes are archived in feedback_records. Include them
+            # explicitly in the challenger dataset even when a caller populated the
+            # queue through a persistence-backed feedback workflow.
+            analyst_rows = []
+            for item in self.feedback_records:
+                outcome = item.get("outcome")
+                row = item.get("row")
+                if outcome not in {"confirmed_fraud", "confirmed_legitimate"} or not isinstance(row, dict) or item.get("training_cycle") is not None:
+                    continue
+                if str(row.get("id") or item.get("transaction_id")) in queued_ids:
+                    continue
+                copy = dict(row)
+                copy["label"] = int(outcome == "confirmed_fraud")
+                analyst_rows.append(copy)
+            feedback = queued + analyst_rows
             if not feedback:
                 feedback = self.generator.generate_attacks(180, intensity=1.08)
-            annotated = [self.detector.score_and_annotate(row) for row in feedback]
             hard = [row for row in feedback if self.detector.predict(row) == 0]
-            # All simulated attacks are retained, while missed attacks receive extra weight.
             augmentation = feedback + hard * 2 + self.generator.generate_legitimate(max(280, len(feedback)))
             max_training = 7000
-            self.training_rows = (self.training_rows + augmentation)[-max_training:]
-            random.Random(self.seed + self.cycle).shuffle(self.training_rows)
+            candidate_training = list((self.training_rows + augmentation)[-max_training:])
+            random.Random(self.seed + self.cycle).shuffle(candidate_training)
             calibration = self.generator.generate_mixed(850, attack_rate=0.27, intensity=1.0)
             evaluation = self.generator.generate_mixed(1250, attack_rate=0.25, intensity=1.04)
             previous = self.detector.evaluate(self.immutable_holdout_rows)
-            self.detector.fit(self.training_rows)
-            self.detector.calibrate(calibration)
-            self.rolling_validation_rows = list(evaluation)
-            rolling_metrics = self.detector.evaluate(self.rolling_validation_rows)
-            self.metrics = self.detector.evaluate(self.immutable_holdout_rows)
-            self.cycle += 1
-            self.history.append(self._history_point("Feedback retrain", self.metrics, self.immutable_holdout_rows))
-            self.validation_reports = self._validation_report()
-            self.store.append("models", {"cycle": self.cycle, "metrics": self.metrics, "rolling_metrics": rolling_metrics, "training_rows": len(self.training_rows)})
-            self.store.append("audit", {"event": "retrain", "cycle": self.cycle, "feedback_rows": len(feedback)})
+            challenger = self.detector.clone()
+            challenger.fit(candidate_training)
+            challenger.calibrate(calibration)
+            rolling_metrics = challenger.evaluate(evaluation)
+            candidate_metrics = challenger.evaluate(self.immutable_holdout_rows)
+            candidate_validation = self._validation_report(challenger, rolling_rows=evaluation)
+            gates = self.governance.evaluate(previous, candidate_metrics, candidate_validation.get("robustness", {}))
+            next_cycle = self.cycle + 1
+            candidate_version = f"hybrid-logit-c{next_cycle}-v{len(self.model_versions) + 1:03d}"
+            duration_ms = round((time.perf_counter() - started) * 1000, 3)
+            candidate_metadata = {
+                "version": candidate_version,
+                "cycle": next_cycle,
+                "status": "APPROVED" if gates["passed"] else "REJECTED",
+                "created_at": self._now(),
+                "dataset_version": self._dataset_version(candidate_training),
+                "training_rows": len(candidate_training),
+                "feedback_rows": len(feedback),
+                "duration_ms": duration_ms,
+                "immutable_holdout_metrics": candidate_metrics,
+                "rolling_metrics": rolling_metrics,
+                "robustness": candidate_validation.get("robustness", {}),
+                "gate_results": gates,
+                "previous_model_version": self.active_model_version,
+            }
+            self._register_model(candidate_metadata, challenger.export_state())
+            self.cycle = next_cycle
+            accepted = bool(gates["passed"])
+            if accepted:
+                old_version = self.active_model_version
+                self.previous_model_version = old_version
+                self.active_model_version = candidate_version
+                self.detector = challenger
+                self.training_rows = candidate_training
+                self.metrics = candidate_metrics
+                self.rolling_validation_rows = list(evaluation)
+                self.validation_reports = candidate_validation
+                for item in self.model_versions:
+                    if item["version"] == old_version:
+                        item["status"] = "APPROVED"
+                self.history.append(self._history_point("Feedback retrain", self.metrics, self.immutable_holdout_rows))
+                self.live_transactions = [self.detector.score_and_annotate(row) for row in self.live_transactions]
+            # The queue is consumed by this candidate decision, while feedback_records
+            # remains an immutable analyst/audit trail for future review.
+            consumed = len(self.feedback_rows)
             self.feedback_rows.clear()
-            self.feedback_records.clear()
-            # Rescore the live stream with the latest model for a consistent dashboard.
-            self.live_transactions = [self.detector.score_and_annotate(row) for row in self.live_transactions]
-            return {
+            for item in self.feedback_records:
+                if item.get("outcome") in {"confirmed_fraud", "confirmed_legitimate"} and item.get("training_cycle") is None:
+                    item["training_cycle"] = self.cycle
+            result = {
                 "cycle": self.cycle,
-                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                "duration_ms": duration_ms,
                 "feedback_rows": len(feedback),
                 "hard_cases": len(hard),
+                "accepted": accepted,
+                "model_version": self.active_model_version,
+                "previous_model_version": self.previous_model_version,
+                "candidate_model_version": candidate_version,
                 "previous_metrics": previous,
                 "metrics": self.metrics,
+                "candidate_metrics": candidate_metrics,
                 "rolling_metrics": rolling_metrics,
-                "deltas": {
-                    key: round(self.metrics.get(key, 0) - previous.get(key, 0), 4)
-                    for key in ("precision", "recall", "f1", "auc", "false_positive_rate")
-                },
+                "deltas": {key: round(self.metrics.get(key, 0) - previous.get(key, 0), 4) for key in ("precision", "recall", "f1", "auc", "false_positive_rate")},
                 "fit": {
-                    "epochs": self.detector.fit_summary.epochs,
-                    "training_rows": self.detector.fit_summary.training_rows,
-                    "loss": round(self.detector.fit_summary.final_loss, 5),
+                    "epochs": challenger.fit_summary.epochs,
+                    "training_rows": challenger.fit_summary.training_rows,
+                    "loss": round(challenger.fit_summary.final_loss, 5),
                 },
-                "validation_reports": self.validation_reports,
+                "validation_reports": self.validation_reports if accepted else candidate_validation,
+                "promotion_gates": gates,
+                "queue_consumed": consumed,
+                "synthetic_evidence": True,
             }
+            self.store.append("audit", {"event": "retrain", "cycle": self.cycle, "feedback_rows": len(feedback), "accepted": accepted, "model_version": candidate_version})
+            return result
 
     def score_transaction(self, transaction: dict) -> dict:
         with self.lock:
@@ -322,7 +475,12 @@ class DefenseEngine:
                 row = next((item for item in reversed(self.live_transactions) if item.get("attack_id")), None)
             if row is None:
                 raise ValueError("No synthetic attack transaction is available to mutate")
-            return self.attacker.search(row, self.detector.score, self.detector.predict, count=count)
+            result = self.attacker.search(row, self.detector.score, self.detector.predict, count=count)
+            result["cycle"] = self.cycle
+            result["model_version"] = self.active_model_version
+            self.mutation_history.append(result)
+            self.store.append("audit", {"event": "mutation_search", "cycle": self.cycle, "model_version": self.active_model_version, "candidate_count": result["candidate_count"], "blind_spots": result["blind_spots"]})
+            return result
 
     def fidelity(self) -> dict:
         with self.lock:
@@ -332,9 +490,11 @@ class DefenseEngine:
             report = compare_streams(reference, candidate)
             report["robustness"] = robustness_report(self.detector, self._evaluation_generator("fidelity-robustness"), self.seed)
             report["policy_tradeoff"] = self.policy.tradeoff(self.immutable_holdout_rows, self.detector)
+            report["model_version"] = self.active_model_version
+            report["measured_scoring_latency_ms_p95"] = self._p95_latency()
             return report
 
-    def submit_feedback(self, transaction_id: str, outcome: str, note: str = "") -> dict:
+    def submit_feedback(self, transaction_id: str, outcome: str, note: str = "", override_decision: str | None = None) -> dict:
         allowed = {"confirmed_fraud", "confirmed_legitimate", "uncertain"}
         if outcome not in allowed:
             raise ValueError(f"outcome must be one of: {', '.join(sorted(allowed))}")
@@ -350,6 +510,8 @@ class DefenseEngine:
                 "row": dict(row),
                 "queued_for_retraining": queued_for_retraining,
             }
+            if override_decision is not None:
+                feedback["override_decision"] = override_decision
             self.feedback_records.append(feedback)
             if queued_for_retraining:
                 training_row = dict(row)
@@ -361,7 +523,34 @@ class DefenseEngine:
 
     def report(self) -> dict:
         with self.lock:
-            return {"synthetic_evidence": True, "cycle": self.cycle, "metrics": self.metrics, "validation": self.validation_reports, "fidelity": self.fidelity(), "simulations": list(self.simulation_history), "feedback": self._feedback_bucket_counts()}
+            fraud_rows = [row for row in self.live_transactions if row.get("label") == 1]
+            return {
+                "synthetic_evidence": True,
+                "generated_at": self._now(),
+                "executive_summary": {
+                    "active_model_version": self.active_model_version,
+                    "cycle": self.cycle,
+                    "attack_catalog_size": len(ATTACKS),
+                    "stream_rows": len(self.live_transactions),
+                    "fraud_rows_in_stream": len(fraud_rows),
+                    "limitations": "Synthetic evidence only; no production performance claim.",
+                },
+                "cycle": self.cycle,
+                "metrics": self.metrics,
+                "validation": self.validation_reports,
+                "fidelity": self.fidelity(),
+                "simulations": list(self.simulation_history),
+                "feedback": self._feedback_bucket_counts(),
+                "model_history": self.models(),
+                "data_quality": {
+                    "training": assess_dataset(self.training_rows, self.immutable_holdout_rows),
+                    "immutable_holdout": assess_dataset(self.immutable_holdout_rows),
+                },
+                "mutations": list(self.mutation_history[-20:]),
+                "policy_tradeoff": self.policy.tradeoff(self.immutable_holdout_rows, self.detector),
+                "recommendations": ["Replay confirmed outcomes by rail and attack family before production promotion.", "Shadow policy actions and measure customer friction against observed loss."],
+                "limitations": ["All transactions and metrics are synthetic evidence.", "Production deployment requires tokenized event adapters, durable storage, access control, and human review."],
+            }
 
     def _queue_feedback(self, row: dict, category: str) -> None:
         item = {"category": category, "transaction_id": row.get("id"), "row": dict(row)}
@@ -371,6 +560,13 @@ class DefenseEngine:
     def _feedback_bucket_counts(self) -> dict:
         counts = Counter(item.get("category", item.get("outcome", "uncertain")) for item in self.feedback_records)
         return {key: counts.get(key, 0) for key in ("missed_attack", "false_positive", "correct_detection", "confirmed_fraud", "confirmed_legitimate", "uncertain")}
+
+    def feedback_queue(self, limit: int = 100) -> list[dict]:
+        with self.lock:
+            bounded = max(1, min(int(limit), 500))
+            if self.feedback_records:
+                return list(reversed(self.feedback_records[-bounded:]))
+            return [item.get("payload", item) for item in self.store.list("feedback", bounded)]
 
     def _p95_latency(self) -> float:
         values = sorted(self.latencies_ms[-1000:])
@@ -383,25 +579,31 @@ class DefenseEngine:
         derived_seed = int.from_bytes(hashlib.sha256(material).digest()[:8], "big")
         return SyntheticGenerator(derived_seed)
 
-    def _validation_report(self, include_robustness: bool = True) -> dict:
-        robust = robustness_report(self.detector, self._evaluation_generator("validation-robustness"), self.seed) if include_robustness else {"status": "available via fidelity endpoint"}
+    def _validation_report(self, detector=None, rolling_rows: list[dict] | None = None, include_robustness: bool = True) -> dict:
+        detector = detector or self.detector
+        robust = robustness_report(detector, self._evaluation_generator("validation-robustness"), self.seed) if include_robustness else {"status": "available via fidelity endpoint"}
         labels = [int(row.get("label", 0)) for row in self.immutable_holdout_rows]
-        hybrid_scores = [self.detector.score(row) for row in self.immutable_holdout_rows]
-        logistic_scores = [self.detector.model_score(row) for row in self.immutable_holdout_rows]
-        rule_scores = [self.detector.expert_score(row) for row in self.immutable_holdout_rows]
+        hybrid_scores = [detector.score(row) for row in self.immutable_holdout_rows]
+        logistic_scores = [detector.model_score(row) for row in self.immutable_holdout_rows]
+        rule_scores = [detector.expert_score(row) for row in self.immutable_holdout_rows]
+        threshold = detector.threshold
         return {
             "synthetic_evidence": True,
-            "immutable_holdout": {"rows": len(self.immutable_holdout_rows), "metrics": self.detector.evaluate(self.immutable_holdout_rows)},
+            "immutable_holdout": {"rows": len(self.immutable_holdout_rows), "metrics": detector.evaluate(self.immutable_holdout_rows)},
+            "time_split": {"rows": len(rolling_rows or self.rolling_validation_rows), "metrics": detector.evaluate(rolling_rows or self.rolling_validation_rows) if (rolling_rows or self.rolling_validation_rows) else {}},
             "baselines": {
-                "rules_only": classification_metrics(labels, rule_scores, self.detector.threshold),
-                "logistic_only": classification_metrics(labels, logistic_scores, self.detector.threshold),
-                "hybrid": classification_metrics(labels, hybrid_scores, self.detector.threshold),
+                "rules_only": classification_metrics(labels, rule_scores, threshold),
+                "logistic_only": classification_metrics(labels, logistic_scores, threshold),
+                "hybrid": classification_metrics(labels, hybrid_scores, threshold),
             },
-            "segments": self._segment_metrics(self.immutable_holdout_rows),
+            "segments": self._segment_metrics(self.immutable_holdout_rows, detector),
+            "leave_one_family_out": self._leave_one_family_out_report(detector),
             "robustness": robust,
+            "data_quality": {"holdout": assess_dataset(self.immutable_holdout_rows), "rolling": assess_dataset(rolling_rows or self.rolling_validation_rows, self.immutable_holdout_rows) if (rolling_rows or self.rolling_validation_rows) else None},
         }
 
-    def _segment_metrics(self, rows: list[dict]) -> dict:
+    def _segment_metrics(self, rows: list[dict], detector=None) -> dict:
+        detector = detector or self.detector
         segments: dict[str, dict[str, list[dict]]] = {"rail": defaultdict(list), "attack_family": defaultdict(list)}
         for row in rows:
             segments["rail"][str(row.get("rail", "unknown"))].append(row)
@@ -410,8 +612,18 @@ class DefenseEngine:
         for group, buckets in segments.items():
             result[group] = {}
             for name, bucket in buckets.items():
-                result[group][name] = self.detector.evaluate(bucket)
+                result[group][name] = detector.evaluate(bucket)
         return result
+
+    def _leave_one_family_out_report(self, detector) -> dict:
+        """Measure candidate recall on each labeled family without retraining on it."""
+        groups: dict[str, list[dict]] = defaultdict(list)
+        for row in self.immutable_holdout_rows:
+            if row.get("label") == 1:
+                groups[str(row.get("attack_family", "unknown"))].append(row)
+        metrics = {family: detector.evaluate(rows) for family, rows in groups.items() if rows}
+        recalls = [item.get("recall", 0.0) for item in metrics.values()]
+        return {"synthetic_evidence": True, "families": metrics, "mean_family_recall": round(sum(recalls) / max(1, len(recalls)), 4), "minimum_family_recall": round(min(recalls), 4) if recalls else 0.0}
 
     @staticmethod
     def _validate_transaction(transaction: dict) -> None:

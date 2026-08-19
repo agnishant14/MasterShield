@@ -6,12 +6,17 @@ import tempfile
 import unittest
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlparse
 
 from sentinel import DefenseEngine
 from sentinel.features import FEATURES, vectorize
 from sentinel.generator import SyntheticGenerator
 from sentinel.attacker import AdaptiveAttacker
 from sentinel.fidelity import compare_streams
+from sentinel.fidelity import seed_reproducibility
+from sentinel.contracts import validate_score_payload, validate_simulate_payload, validate_rollback_payload
+from sentinel.governance import PromotionGates
+from sentinel.quality import assess_dataset
 from sentinel.policy import RiskPolicy
 from sentinel.storage import EventStore
 from sentinel.taxonomy import ATTACKS, ATTACK_BY_ID
@@ -66,6 +71,27 @@ class GeneratorTests(unittest.TestCase):
 
 
 class NewCapabilityTests(unittest.TestCase):
+    def test_contracts_reject_unknown_nonfinite_and_bad_ranges(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unexpected scoring fields"):
+            validate_score_payload({"amount": 1, "currency": "USD", "rail": "wallet", "channel": "app", "account_age_days": 1, "device_age_days": 1, "secret": "x"})
+        with self.assertRaisesRegex(ValueError, "amount must be finite"):
+            validate_score_payload({"amount": float("nan"), "currency": "USD", "rail": "wallet", "channel": "app", "account_age_days": 1, "device_age_days": 1})
+        with self.assertRaisesRegex(ValueError, "count must be between"):
+            validate_simulate_payload({"count": 501})
+        with self.assertRaisesRegex(ValueError, "model_version must"):
+            validate_rollback_payload({"model_version": ""})
+
+    def test_governance_has_explicit_gate_results(self) -> None:
+        result = PromotionGates().evaluate({"f1": 0.95, "recall": 0.95}, {"f1": 0.96, "recall": 0.96, "false_positive_rate": 0.01}, {"unseen_attack_families": {"attack_recall": 0.9}})
+        self.assertTrue(result["passed"])
+        self.assertIn("checks", result)
+
+    def test_quality_and_seed_evidence_are_deterministic(self) -> None:
+        rows = SyntheticGenerator(51).generate_mixed(16)
+        quality = assess_dataset(rows)
+        self.assertTrue(quality["synthetic_evidence"])
+        self.assertEqual(16, quality["rows"])
+        self.assertTrue(seed_reproducibility(51, 16)["reproducible"])
     def test_adaptive_attacker_is_seeded_and_safe(self) -> None:
         row = SyntheticGenerator(4).generate_attacks(1, ["atk-001"])[0]
         attacker = AdaptiveAttacker(77)
@@ -175,6 +201,25 @@ class ClosedLoopTests(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertEqual(first, second)
 
+    def test_model_registry_and_rollback_restore_snapshot(self) -> None:
+        engine = DefenseEngine(seed=2077)
+        original = engine.active_model_version
+        result = engine.retrain()
+        self.assertIn(result["candidate_model_version"], {item["version"] for item in engine.models()})
+        self.assertTrue(engine.active_model_version)
+        rollback = engine.rollback_model(original)
+        self.assertEqual(original, rollback["model_version"])
+        self.assertEqual(original, engine.active_model_version)
+
+    def test_confirmed_analyst_feedback_is_consumed_but_archived(self) -> None:
+        engine = DefenseEngine(seed=2078)
+        row = next(item for item in engine.live_transactions if item.get("label") == 0)
+        engine.submit_feedback(row["id"], "confirmed_fraud", "analyst evidence")
+        result = engine.retrain()
+        self.assertGreaterEqual(result["feedback_rows"], 1)
+        self.assertEqual(0, len(engine.feedback_rows))
+        self.assertTrue(any(item.get("training_cycle") == engine.cycle for item in engine.feedback_records))
+
     def test_latency_uses_nearest_rank_p95(self) -> None:
         engine = DefenseEngine(seed=2041)
         engine.latencies_ms = [float(value) for value in range(1, 21)]
@@ -216,6 +261,7 @@ class WebArtifactTests(unittest.TestCase):
     def test_vercel_wsgi_entrypoint_serves_health_and_console(self) -> None:
         def request(path: str, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], bytes]:
             captured: dict[str, object] = {}
+            parsed = urlparse(path)
 
             def start_response(status: str, headers: list[tuple[str, str]], _exc_info=None) -> None:
                 captured["status"] = status
@@ -223,8 +269,8 @@ class WebArtifactTests(unittest.TestCase):
 
             environ = {
                 "REQUEST_METHOD": method,
-                "PATH_INFO": path,
-                "QUERY_STRING": "",
+                "PATH_INFO": parsed.path,
+                "QUERY_STRING": parsed.query,
                 "CONTENT_LENGTH": str(len(body)),
                 "wsgi.input": BytesIO(body),
             }
@@ -238,7 +284,20 @@ class WebArtifactTests(unittest.TestCase):
         self.assertEqual("ok", health["status"])
         self.assertIn("fidelity", health["capabilities"])
         self.assertIn("mutate", health["capabilities"])
+        self.assertIn("models", health["capabilities"])
+        self.assertIn("rollback", health["capabilities"])
+        self.assertIn("audit", health["capabilities"])
         self.assertTrue(health["api_version"])
+
+        status, headers, body = request("/api/models")
+        self.assertEqual("200 OK", status)
+        self.assertTrue(json.loads(body)["models"])
+        status, headers, body = request("/api/audit?limit=5")
+        self.assertEqual("200 OK", status)
+        self.assertIsInstance(json.loads(body)["audit"], list)
+        status, headers, body = request("/api/report?format=csv")
+        self.assertEqual("200 OK", status)
+        self.assertIn("text/csv", headers["Content-Type"])
 
         for path in ("/api/fidelity", "/api/fidelity/"):
             status, headers, body = request(path)

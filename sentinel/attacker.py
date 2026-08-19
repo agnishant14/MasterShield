@@ -29,6 +29,9 @@ class MutationCandidate:
     risk_score: float
     detected: bool
     objective: float
+    perturbation_cost: float
+    risk_delta: float
+    attack_success: bool
 
     def to_dict(self) -> dict:
         return {
@@ -37,6 +40,10 @@ class MutationCandidate:
             "risk_score": self.risk_score,
             "detected": self.detected,
             "objective": self.objective,
+            "mutation_count": len(self.mutations),
+            "perturbation_cost": self.perturbation_cost,
+            "risk_delta": self.risk_delta,
+            "attack_success": self.attack_success,
         }
 
 
@@ -106,13 +113,35 @@ class AdaptiveAttacker:
         for candidate, mutations in self.mutate(row, count=count):
             score = float(scorer(candidate))
             detected = bool(predictor(candidate))
-            objective = score + (0.12 if detected else 0.0)
-            evaluated.append(MutationCandidate(candidate, mutations, round(score, 4), detected, round(objective, 4)))
+            perturbation_cost = sum(self._mutation_cost(mutation) for mutation in mutations) / max(1, len(mutations))
+            risk_delta = round(score - original_score, 4)
+            attack_success = not detected
+            objective = score + perturbation_cost * 0.08 + (0.12 if detected else 0.0)
+            evaluated.append(MutationCandidate(candidate, mutations, round(score, 4), detected, round(objective, 4), round(perturbation_cost, 4), risk_delta, attack_success))
         evaluated.sort(key=lambda item: (item.objective, item.risk_score))
+        successful = [item for item in evaluated if item.attack_success]
+        vulnerable = {}
+        for item in successful:
+            for mutation in item.mutations:
+                vulnerable[mutation.feature] = vulnerable.get(mutation.feature, 0) + 1
         return {
             "original": {"id": row.get("id"), "attack_id": row.get("attack_id"), "risk_score": round(original_score, 4), "detected": bool(predictor(row))},
             "candidate_count": len(evaluated),
             "blind_spots": sum(not item.detected for item in evaluated),
+            "attack_success_rate": round(len(successful) / max(1, len(evaluated)), 4),
+            "mean_perturbation_cost": round(sum(item.perturbation_cost for item in evaluated) / max(1, len(evaluated)), 4),
+            "minimum_success_cost": round(min((item.perturbation_cost for item in successful), default=0.0), 4),
+            "vulnerable_features": [{"feature": feature, "count": count} for feature, count in sorted(vulnerable.items(), key=lambda pair: pair[1], reverse=True)[:8]],
             "candidates": [item.to_dict() for item in evaluated[:max(1, min(top_k, 20))]],
             "safety": "synthetic feature mutations only; no live targets, credentials, or payment actions",
         }
+
+    @staticmethod
+    def _mutation_cost(mutation: Mutation) -> float:
+        try:
+            before = float(mutation.before or 0.0)
+            after = float(mutation.after or 0.0)
+        except (TypeError, ValueError):
+            return 1.0
+        scale = max(1.0, abs(before), abs(after))
+        return min(1.0, abs(after - before) / scale)

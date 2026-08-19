@@ -23,9 +23,9 @@ const API_CONTROLS = {
 
 const OUTDATED_BACKEND_MESSAGE = "Backend API is outdated; redeploy the current app.py.";
 const OFFLINE_ACTION_MESSAGE = "Interactive actions require the Python server; run python3 app.py.";
-const REQUIRED_UI_CAPABILITIES = ["overview", "attacks", "simulate", "retrain", "fidelity", "report", "mutate", "feedback"];
+const REQUIRED_UI_CAPABILITIES = ["overview", "attacks", "simulate", "retrain", "fidelity", "report", "mutate", "feedback", "models", "rollback", "audit"];
 const OFFLINE_CAPABILITIES = ["overview", "attacks", "transactions", "fidelity", "report", "mutate", "simulations"];
-const REQUEST_TIMEOUTS_MS = { "/api/retrain": 60000, "/api/fidelity": 60000, "/api/report": 60000, "/api/mutate": 30000 };
+const REQUEST_TIMEOUTS_MS = { "/api/retrain": 120000, "/api/fidelity": 90000, "/api/report": 90000, "/api/mutate": 30000 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -332,6 +332,7 @@ function renderOverview() {
   $("#side-feedback").textContent = `${state.feedbackQueued} queued`;
   $("#topbar-feedback").textContent = `${state.feedbackQueued} queued`;
   $("#threshold-value").textContent = Number(metrics.threshold).toFixed(2);
+  $("#latency-p95").textContent = `${Number(data.system?.latency_ms_p95 || 0).toFixed(2)} ms`;
   renderTransactions(data.recent_transactions || []);
   renderAttackMix(data.attack_mix || []);
   const activeCoverage = data.detected_attack_coverage;
@@ -435,6 +436,7 @@ function renderFidelity(data) {
     ["Unseen attack families", robustness.unseen_attack_families],
     ["Missing features", robustness.missing_features],
     ["Legitimate baseline", robustness.legitimate_baseline],
+    ["Adversarial accuracy", { attack_recall: robustness.adversarial ? robustness.adversarial.adversarial_accuracy : 0 }],
   ];
   $("#robustness-list").innerHTML = rows.map(([label, value]) => `<div class="importance-row"><span>${label}</span><div class="importance-bar"><i style="width:${Math.max(3, Number(value?.attack_recall || 0) * 100)}%"></i></div><b>${pct(value?.attack_recall || 0)}</b></div>`).join("");
   const policy = data.policy_tradeoff || {};
@@ -500,6 +502,26 @@ function renderDefense() {
   $("#history-list").innerHTML = history.map((item) => `
     <div class="history-item"><span>CYCLE ${String(item.cycle).padStart(2, "0")}</span><strong>${escapeHTML(item.name)}</strong><div class="history-stats"><span>F1 <b>${pct(item.f1)}</b></span><span>RECALL <b>${pct(item.recall)}</b></span><span>FPR <b>${pct(item.fpr)}</b></span></div></div>
   `).join("") + `<div class="history-item"><span>PRODUCTION SHAPE</span><strong>${escapeHTML(system.model_version)}</strong><div class="history-stats"><span>P95 <b>${system.latency_ms_p95} ms</b></span><span>RAILS <b>6</b></span></div></div>`;
+  const models = state.overview.model_versions || [];
+  $("#model-lifecycle").innerHTML = models.map((model) => `
+    <div class="history-item"><span>${escapeHTML(model.status || "UNKNOWN")}</span><strong>${escapeHTML(model.version)}</strong><div class="history-stats"><span>F1 <b>${pct(model.immutable_holdout_metrics?.f1 || 0)}</b></span><span>ROWS <b>${compactNumber(model.training_rows || 0)}</b></span>${model.status !== "ACTIVE" && model.status !== "REJECTED" ? `<button class="table-action" data-rollback-model="${escapeHTML(model.version)}" title="Rollback to ${escapeHTML(model.version)}" aria-label="Rollback to ${escapeHTML(model.version)}"><i data-lucide="undo-2"></i></button>` : ""}</div></div>
+  `).join("") || `<div class="empty-state"><strong>No model metadata yet.</strong></div>`;
+  $$('[data-rollback-model]').forEach((button) => button.addEventListener("click", () => rollbackModel(button.dataset.rollbackModel)));
+  refreshIcons();
+}
+
+async function rollbackModel(modelVersion) {
+  if (!state.capabilities?.has("rollback")) {
+    toast(OUTDATED_BACKEND_MESSAGE);
+    return;
+  }
+  try {
+    const result = await requestJSON("/api/models/rollback", { method: "POST", body: JSON.stringify({ model_version: modelVersion }) });
+    toast(`Rolled back to ${result.model_version}.`);
+    await refreshData();
+  } catch (error) {
+    toast(`Rollback failed: ${error.message}`);
+  }
 }
 
 async function loadData() {
@@ -624,7 +646,7 @@ async function retrainModel() {
     await refreshData();
     const f1Delta = result.deltas.f1;
     const duration = Number(result.duration_ms || 0);
-    toast(`Cycle ${result.cycle} trained on ${result.feedback_rows} feedback rows in ${(duration / 1000).toFixed(1)}s. F1 ${f1Delta >= 0 ? "+" : ""}${pct(f1Delta)}.`);
+    toast(`${result.accepted ? "Promoted" : "Rejected"} challenger ${result.candidate_model_version} after ${(duration / 1000).toFixed(1)}s. F1 ${f1Delta >= 0 ? "+" : ""}${pct(f1Delta)}.`);
   } catch (error) {
     toast(`Retraining failed: ${error.message}`);
   } finally {

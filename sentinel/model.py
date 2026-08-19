@@ -154,6 +154,43 @@ class HybridFraudDetector:
     def _standardize(self, values: list[float]) -> list[float]:
         return [(value - mean) / scale for value, mean, scale in zip(values, self.means, self.scales)]
 
+    def export_state(self) -> dict:
+        """Return an internal rollback snapshot without exposing it through the API."""
+        return {
+            "seed": self.seed,
+            "means": list(self.means),
+            "scales": list(self.scales),
+            "weights": list(self.weights),
+            "bias": self.bias,
+            "threshold": self.threshold,
+            "fit_summary": {
+                "epochs": self.fit_summary.epochs,
+                "training_rows": self.fit_summary.training_rows,
+                "positive_rate": self.fit_summary.positive_rate,
+                "final_loss": self.fit_summary.final_loss,
+            },
+        }
+
+    def load_state(self, state: dict) -> None:
+        self.seed = int(state["seed"])
+        self.means = [float(value) for value in state["means"]]
+        self.scales = [float(value) for value in state["scales"]]
+        self.weights = [float(value) for value in state["weights"]]
+        self.bias = float(state["bias"])
+        self.threshold = float(state["threshold"])
+        summary = state["fit_summary"]
+        self.fit_summary = FitSummary(
+            int(summary["epochs"]),
+            int(summary["training_rows"]),
+            float(summary["positive_rate"]),
+            float(summary["final_loss"]),
+        )
+
+    def clone(self) -> "HybridFraudDetector":
+        clone = HybridFraudDetector(self.seed)
+        clone.load_state(self.export_state())
+        return clone
+
     def fit(self, rows: list[dict], epochs: int = 105, learning_rate: float = 0.055, l2: float = 0.018) -> FitSummary:
         if not rows:
             raise ValueError("Training requires at least one row")
@@ -251,16 +288,22 @@ class HybridFraudDetector:
         values = vectorize(row)
         standardized = self._standardize(values)
         contributions = []
-        for name, raw, weight, z_value in zip(FEATURES, values, self.weights, standardized):
+        for index, (name, raw, weight, z_value) in enumerate(zip(FEATURES, values, self.weights, standardized)):
             contribution = weight * z_value
             if contribution > 0.02:
                 contributions.append({
                     "feature": name,
                     "label": FEATURE_LABELS[name],
                     "value": round(raw, 3),
+                    "baseline": round(self.means[index], 3),
+                    "anomaly_magnitude": round(abs(z_value), 3),
                     "contribution": round(contribution, 3),
                 })
-        return sorted(contributions, key=lambda item: item["contribution"], reverse=True)[:limit]
+        ranked = sorted(contributions, key=lambda item: item["contribution"], reverse=True)[:limit]
+        total = sum(item["contribution"] for item in ranked)
+        for item in ranked:
+            item["contribution_share"] = round(item["contribution"] / total, 4) if total else 0.0
+        return ranked
 
     def feature_importance(self, limit: int = 12) -> list[dict]:
         pairs = [
@@ -274,7 +317,9 @@ class HybridFraudDetector:
         started = time.perf_counter()
         risk = self.score(row)
         annotated["risk_score"] = round(risk, 4)
-        annotated["decision"] = "decline" if risk >= max(0.82, self.threshold + 0.18) else "review" if risk >= self.threshold else "approve"
+        decline_threshold = max(0.82, self.threshold + 0.18)
+        annotated["decision"] = "decline" if risk >= decline_threshold else "review" if risk >= self.threshold else "approve"
+        annotated["risk_level"] = "critical" if risk >= decline_threshold else "high" if risk >= self.threshold else "medium" if risk >= self.threshold * 0.65 else "low"
         annotated["explanations"] = self.explain(row)
         annotated["scoring_latency_ms"] = round((time.perf_counter() - started) * 1000, 4)
         return annotated

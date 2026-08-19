@@ -10,6 +10,7 @@
 6. Finish on Judge evidence. Use the artifact checklist as the handoff to the repository and deck.
 7. Open Fidelity and robustness. Run evidence, point out that all numbers are synthetic, then run adaptive mutation search and show the mutation path plus any blind spots.
 8. Submit analyst feedback on a transaction, retrain, and compare the cycle metrics and policy trade-off.
+9. Open the model-governance panel, compare the active and rejected challenger versions, then exercise rollback if a stored prior snapshot is available.
 
 ## Judge questions to pre-answer
 
@@ -20,6 +21,9 @@
 - **How do you prevent the simulator from being dangerous?** It emits synthetic payment records and risk signals only. It does not target accounts, provide evasion instructions, or connect to payment rails.
 - **How do you address overfitting?** The bootstrap test set is immutable, and the dashboard also reports low-intensity, unseen-family, and missing-feature robustness checks.
 - **What happens after a score?** A policy layer maps risk to approve, step-up, review, hold, or decline, retaining reason codes and synthetic friction/loss estimates for the eventual live policy service.
+- **Can feedback really affect training?** Confirmed fraud and legitimate outcomes are copied into the challenger dataset on the next retrain. The queue is consumed after the candidate decision, while the archived analyst record remains available for audit and is tagged with the cycle that consumed it.
+- **Why might retraining reject a model?** Promotion is gated by immutable-holdout quality, FPR, regression tolerances, and unseen-family recall. A rejected challenger is recorded rather than silently replacing the active model.
+- **What is persisted?** With `MASTERSHIELD_DB`, feedback, simulations, model metadata, and audit events are stored in SQLite. In-memory detector snapshots are demo-local; production should use a signed artifact registry.
 
 ## Walkthrough outline
 

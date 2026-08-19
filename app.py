@@ -4,18 +4,31 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import mimetypes
 import os
-import math
+import sys
+import time
 import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
+from io import StringIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from sentinel import DefenseEngine
+from sentinel.contracts import (
+    MAX_BODY_BYTES,
+    validate_feedback_payload,
+    validate_limit,
+    validate_mutate_payload,
+    validate_retrain_payload,
+    validate_rollback_payload,
+    validate_score_payload,
+    validate_simulate_payload,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -34,6 +47,9 @@ API_CAPABILITIES = (
     "feedback",
     "simulations",
     "report",
+    "models",
+    "rollback",
+    "audit",
 )
 
 
@@ -46,37 +62,11 @@ def _health_payload(request_id: str | None = None) -> dict:
         "status": "ok",
         "api_version": API_VERSION,
         "capabilities": list(API_CAPABILITIES),
-        "model_version": f"hybrid-logit-c{ENGINE.cycle}",
+        "model_version": ENGINE.active_model_version or f"hybrid-logit-c{ENGINE.cycle}",
     }
     if request_id:
         payload["request_id"] = request_id
     return payload
-
-
-def _validate_simulate_payload(payload: dict) -> None:
-    attack_ids = payload.get("attack_ids", [])
-    if not isinstance(attack_ids, list) or not all(isinstance(item, str) for item in attack_ids):
-        raise ValueError("attack_ids must be a list of strings")
-    count = payload.get("count", 80)
-    intensity = payload.get("intensity", 1.0)
-    if isinstance(count, bool) or not isinstance(count, (int, float)) or not math.isfinite(float(count)):
-        raise ValueError("count must be a finite number")
-    if isinstance(intensity, bool) or not isinstance(intensity, (int, float)) or not math.isfinite(float(intensity)):
-        raise ValueError("intensity must be a finite number")
-    if float(count) < 5 or float(count) > 500:
-        raise ValueError("count must be between 5 and 500")
-    if float(intensity) < 0.35 or float(intensity) > 1.4:
-        raise ValueError("intensity must be between 0.35 and 1.4")
-
-
-def _validate_mutate_payload(payload: dict) -> None:
-    if payload.get("transaction_id") is not None and not isinstance(payload.get("transaction_id"), str):
-        raise ValueError("transaction_id must be a string")
-    if payload.get("attack_id") is not None and not isinstance(payload.get("attack_id"), str):
-        raise ValueError("attack_id must be a string")
-    count = payload.get("count", 24)
-    if isinstance(count, bool) or not isinstance(count, (int, float)) or not math.isfinite(float(count)) or not 1 <= float(count) <= 100:
-        raise ValueError("count must be between 1 and 100")
 
 
 def _parse_json_object(raw: bytes) -> dict:
@@ -104,6 +94,20 @@ def _json_response(payload: object, status: int = HTTPStatus.OK, request_id: str
     if request_id:
         headers.append(("X-Request-ID", request_id))
     return int(status), headers, body
+
+
+def _csv_response(rows: list[dict], request_id: str | None = None) -> tuple[int, list[tuple[str, str]], bytes]:
+    fields = sorted({key for row in rows for key in row}) if rows else ["message"]
+    stream = StringIO()
+    writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({key: json.dumps(value, ensure_ascii=True) if isinstance(value, (dict, list)) else value for key, value in row.items()})
+    body = stream.getvalue().encode("utf-8")
+    headers = [("Content-Type", "text/csv; charset=utf-8"), ("Content-Length", str(len(body))), ("Cache-Control", "no-store"), ("X-Content-Type-Options", "nosniff")]
+    if request_id:
+        headers.append(("X-Request-ID", request_id))
+    return int(HTTPStatus.OK), headers, body
 
 
 def _static_response(relative: str) -> tuple[int, list[tuple[str, str]], bytes]:
@@ -135,10 +139,19 @@ def _read_wsgi_body(environ: dict) -> dict:
         length = int(environ.get("CONTENT_LENGTH") or "0")
     except ValueError as exc:
         raise ValueError("Content-Length must be an integer") from exc
-    if length > 1_000_000:
+    if length < 0 or length > MAX_BODY_BYTES:
         raise ValueError("Request body too large")
     stream = environ.get("wsgi.input") or BytesIO()
     return _parse_json_object(stream.read(length) if length else b"{}")
+
+
+def _structured_log(event: str, **fields: object) -> None:
+    """Emit bounded JSON request logs without payment or identity payloads."""
+    if os.environ.get("MASTERSHIELD_QUIET") == "1":
+        return
+    safe = {"timestamp": time.time(), "event": event}
+    safe.update({key: value for key, value in fields.items() if key not in {"body", "payload", "transaction", "customer_id", "device_id"}})
+    print(json.dumps(safe, separators=(",", ":"), ensure_ascii=True), file=sys.stderr)
 
 
 def _dispatch_wsgi(environ: dict) -> tuple[int, list[tuple[str, str]], bytes]:
@@ -156,19 +169,24 @@ def _dispatch_wsgi(environ: dict) -> tuple[int, list[tuple[str, str]], bytes]:
             if path == "/api/attacks":
                 return _json_response({"attacks": ENGINE.attacks()}, request_id=request_id)
             if path == "/api/transactions":
-                try:
-                    limit = int(query.get("limit", ["100"])[0])
-                except ValueError as exc:
-                    raise ValueError("limit must be an integer") from exc
+                limit = validate_limit(query.get("limit", ["100"])[0])
                 return _json_response({"transactions": ENGINE.transactions(limit)}, request_id=request_id)
             if path == "/api/fidelity":
                 return _json_response(ENGINE.fidelity(), request_id=request_id)
             if path == "/api/report":
+                if query.get("format", ["json"])[0].lower() == "csv":
+                    return _csv_response([{"section": "metrics", **ENGINE.metrics}, {"section": "policy_tradeoff", **ENGINE.policy.tradeoff(ENGINE.immutable_holdout_rows, ENGINE.detector)}], request_id)
                 return _json_response(ENGINE.report(), request_id=request_id)
             if path == "/api/simulations":
+                if query.get("format", ["json"])[0].lower() == "csv":
+                    return _csv_response(ENGINE.simulations(), request_id)
                 return _json_response({"simulations": ENGINE.simulations()}, request_id=request_id)
             if path == "/api/feedback":
-                return _json_response({"feedback": ENGINE.store.list("feedback")}, request_id=request_id)
+                return _json_response({"feedback": ENGINE.feedback_queue(validate_limit(query.get("limit", ["100"])[0]))}, request_id=request_id)
+            if path == "/api/models":
+                return _json_response({"models": ENGINE.models(), "active_model_version": ENGINE.active_model_version}, request_id=request_id)
+            if path == "/api/audit":
+                return _json_response({"audit": ENGINE.audit(validate_limit(query.get("limit", ["100"])[0]))}, request_id=request_id)
             if path.startswith("/api/"):
                 return _json_response({"error": "API endpoint not found", "request_id": request_id}, HTTPStatus.NOT_FOUND, request_id)
             return _static_response(path)
@@ -176,25 +194,27 @@ def _dispatch_wsgi(environ: dict) -> tuple[int, list[tuple[str, str]], bytes]:
         if method == "POST":
             payload = _read_wsgi_body(environ)
             if path == "/api/simulate":
-                _validate_simulate_payload(payload)
+                validate_simulate_payload(payload)
                 result = ENGINE.simulate(payload.get("attack_ids") or [], payload.get("count", 80), payload.get("intensity", 1.0))
                 result["request_id"] = request_id
                 return _json_response(result, HTTPStatus.CREATED, request_id)
             if path == "/api/mutate":
-                _validate_mutate_payload(payload)
+                validate_mutate_payload(payload)
                 result = ENGINE.mutate_transaction(payload.get("transaction_id"), payload.get("attack_id"), payload.get("count", 24))
                 result["request_id"] = request_id
                 return _json_response(result, request_id=request_id)
             if path == "/api/retrain":
-                if payload and payload.keys() - {"confirm"}:
-                    raise ValueError("retrain accepts only the optional confirm field")
-                return _json_response(ENGINE.retrain(), request_id=request_id)
+                validate_retrain_payload(payload)
+                return _json_response(ENGINE.retrain(confirm=payload.get("confirm", False)), request_id=request_id)
             if path == "/api/score":
+                validate_score_payload(payload)
                 return _json_response(ENGINE.score_transaction(payload), request_id=request_id)
             if path == "/api/feedback":
-                if not isinstance(payload.get("transaction_id"), str) or not isinstance(payload.get("outcome"), str):
-                    raise ValueError("transaction_id and outcome are required strings")
-                return _json_response(ENGINE.submit_feedback(payload["transaction_id"], payload["outcome"], payload.get("note", "")), HTTPStatus.CREATED, request_id)
+                validate_feedback_payload(payload)
+                return _json_response(ENGINE.submit_feedback(payload["transaction_id"], payload["outcome"], payload.get("note", ""), payload.get("override_decision")), HTTPStatus.CREATED, request_id)
+            if path == "/api/models/rollback":
+                validate_rollback_payload(payload)
+                return _json_response(ENGINE.rollback_model(payload["model_version"]), request_id=request_id)
             return _json_response({"error": "API endpoint not found", "request_id": request_id}, HTTPStatus.NOT_FOUND, request_id)
 
         if method == "HEAD":
@@ -203,17 +223,22 @@ def _dispatch_wsgi(environ: dict) -> tuple[int, list[tuple[str, str]], bytes]:
         return _json_response({"error": "Method not allowed"}, HTTPStatus.METHOD_NOT_ALLOWED, request_id)
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         return _json_response({"error": str(exc), "request_id": request_id}, HTTPStatus.BAD_REQUEST, request_id)
-    except Exception as exc:  # pragma: no cover - top-level guard for serverless resilience
-        if os.environ.get("MASTERSHIELD_DEBUG") == "1":
-            error = str(exc)
-        else:
-            error = "Internal server error"
-        return _json_response({"error": error, "request_id": request_id}, HTTPStatus.INTERNAL_SERVER_ERROR, request_id)
+    except Exception:  # pragma: no cover - top-level guard for serverless resilience
+        return _json_response({"error": "Internal server error", "request_id": request_id}, HTTPStatus.INTERNAL_SERVER_ERROR, request_id)
 
 
 def app(environ: dict, start_response) -> list[bytes]:
     """WSGI entrypoint used by Vercel's Python runtime."""
+    started = time.perf_counter()
     status, headers, body = _dispatch_wsgi(environ)
+    _structured_log(
+        "http_request",
+        method=environ.get("REQUEST_METHOD", "GET").upper(),
+        path=_normalize_path(environ.get("PATH_INFO")),
+        request_id=headers[-1][1] if headers and headers[-1][0] == "X-Request-ID" else None,
+        status=status,
+        duration_ms=round((time.perf_counter() - started) * 1000, 3),
+    )
     start_response(f"{status} {HTTPStatus(status).phrase}", headers)
     return [body]
 
@@ -235,16 +260,27 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_header("X-Request-ID", getattr(self, "request_id", str(uuid.uuid4())))
         self.end_headers()
         self.wfile.write(body)
+        started = getattr(self, "request_started", None)
+        _structured_log("http_request", method=self.command, path=_normalize_path(urlparse(self.path).path), request_id=getattr(self, "request_id", None), status=int(status), duration_ms=round((time.perf_counter() - started) * 1000, 3) if started else None)
 
     def _body(self) -> dict:
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError as exc:
             raise ValueError("Content-Length must be an integer") from exc
-        if length > 1_000_000:
+        if length < 0 or length > MAX_BODY_BYTES:
             raise ValueError("Request body too large")
         raw = self.rfile.read(length) if length else b"{}"
         return _parse_json_object(raw)
+
+    def _raw(self, status: int, headers: list[tuple[str, str]], body: bytes) -> None:
+        self.send_response(status)
+        for key, value in headers:
+            self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(body)
+        started = getattr(self, "request_started", None)
+        _structured_log("http_request", method=self.command, path=_normalize_path(urlparse(self.path).path), request_id=getattr(self, "request_id", None), status=int(status), duration_ms=round((time.perf_counter() - started) * 1000, 3) if started else None)
 
     def _static(self, relative: str) -> None:
         requested = (WEB_ROOT / relative.lstrip("/")).resolve()
@@ -268,11 +304,14 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "SAMEORIGIN")
         self.end_headers()
         self.wfile.write(body)
+        started = getattr(self, "request_started", None)
+        _structured_log("http_request", method=self.command, path=_normalize_path(urlparse(self.path).path), request_id=getattr(self, "request_id", None), status=200, duration_ms=round((time.perf_counter() - started) * 1000, 3) if started else None)
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = _normalize_path(parsed.path)
         self.request_id = self.headers.get("X-Request-ID") or str(uuid.uuid4())
+        self.request_started = time.perf_counter()
         try:
             if path == "/api/health":
                 self._json(_health_payload(self.request_id))
@@ -281,36 +320,46 @@ class AppHandler(BaseHTTPRequestHandler):
             elif path == "/api/attacks":
                 self._json({"attacks": ENGINE.attacks()})
             elif path == "/api/transactions":
-                try:
-                    limit = int(parse_qs(parsed.query).get("limit", ["100"])[0])
-                except ValueError as exc:
-                    raise ValueError("limit must be an integer") from exc
+                limit = validate_limit(parse_qs(parsed.query).get("limit", ["100"])[0])
                 self._json({"transactions": ENGINE.transactions(limit)})
             elif path == "/api/fidelity":
                 self._json(ENGINE.fidelity())
             elif path == "/api/report":
+                if parse_qs(parsed.query).get("format", ["json"])[0].lower() == "csv":
+                    status, headers, body = _csv_response([{"section": "metrics", **ENGINE.metrics}, {"section": "policy_tradeoff", **ENGINE.policy.tradeoff(ENGINE.immutable_holdout_rows, ENGINE.detector)}], self.request_id)
+                    self._raw(status, headers, body)
+                    return
                 self._json(ENGINE.report())
             elif path == "/api/simulations":
+                if parse_qs(parsed.query).get("format", ["json"])[0].lower() == "csv":
+                    status, headers, body = _csv_response(ENGINE.simulations(), self.request_id)
+                    self._raw(status, headers, body)
+                    return
                 self._json({"simulations": ENGINE.simulations()})
             elif path == "/api/feedback":
-                self._json({"feedback": ENGINE.store.list("feedback")})
+                self._json({"feedback": ENGINE.feedback_queue(validate_limit(parse_qs(parsed.query).get("limit", ["100"])[0]))})
+            elif path == "/api/models":
+                self._json({"models": ENGINE.models(), "active_model_version": ENGINE.active_model_version})
+            elif path == "/api/audit":
+                self._json({"audit": ENGINE.audit(validate_limit(parse_qs(parsed.query).get("limit", ["100"])[0]))})
             elif path.startswith("/api/"):
                 self._json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
             else:
                 self._static(path if path != "/" else "/index.html")
         except (ValueError, TypeError) as exc:
             self._json({"error": str(exc), "request_id": self.request_id}, HTTPStatus.BAD_REQUEST)
-        except Exception as exc:  # pragma: no cover - top-level guard for prototype resilience
-            self._json({"error": str(exc) if os.environ.get("MASTERSHIELD_DEBUG") == "1" else "Internal server error", "request_id": self.request_id}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        except Exception:  # pragma: no cover - top-level guard for prototype resilience
+            self._json({"error": "Internal server error", "request_id": self.request_id}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = _normalize_path(parsed.path)
         self.request_id = self.headers.get("X-Request-ID") or str(uuid.uuid4())
+        self.request_started = time.perf_counter()
         try:
             payload = self._body()
             if path == "/api/simulate":
-                _validate_simulate_payload(payload)
+                validate_simulate_payload(payload)
                 result = ENGINE.simulate(
                     payload.get("attack_ids") or [],
                     payload.get("count", 80),
@@ -318,22 +367,26 @@ class AppHandler(BaseHTTPRequestHandler):
                 )
                 self._json(result, HTTPStatus.CREATED)
             elif path == "/api/retrain":
-                self._json(ENGINE.retrain())
+                validate_retrain_payload(payload)
+                self._json(ENGINE.retrain(confirm=payload.get("confirm", False)))
             elif path == "/api/mutate":
-                _validate_mutate_payload(payload)
+                validate_mutate_payload(payload)
                 self._json(ENGINE.mutate_transaction(payload.get("transaction_id"), payload.get("attack_id"), payload.get("count", 24)))
             elif path == "/api/score":
+                validate_score_payload(payload)
                 self._json(ENGINE.score_transaction(payload))
             elif path == "/api/feedback":
-                if not isinstance(payload.get("transaction_id"), str) or not isinstance(payload.get("outcome"), str):
-                    raise ValueError("transaction_id and outcome are required strings")
-                self._json(ENGINE.submit_feedback(payload["transaction_id"], payload["outcome"], payload.get("note", "")), HTTPStatus.CREATED)
+                validate_feedback_payload(payload)
+                self._json(ENGINE.submit_feedback(payload["transaction_id"], payload["outcome"], payload.get("note", ""), payload.get("override_decision")), HTTPStatus.CREATED)
+            elif path == "/api/models/rollback":
+                validate_rollback_payload(payload)
+                self._json(ENGINE.rollback_model(payload["model_version"]))
             else:
                 self._json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._json({"error": str(exc), "request_id": self.request_id}, HTTPStatus.BAD_REQUEST)
-        except Exception as exc:  # pragma: no cover
-            self._json({"error": str(exc) if os.environ.get("MASTERSHIELD_DEBUG") == "1" else "Internal server error", "request_id": self.request_id}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        except Exception:  # pragma: no cover
+            self._json({"error": "Internal server error", "request_id": self.request_id}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def log_message(self, fmt: str, *args: object) -> None:
         if os.environ.get("MASTERSHIELD_QUIET") != "1":
@@ -347,7 +400,7 @@ def main() -> None:
     args = parser.parse_args()
     server = ThreadingHTTPServer((args.host, args.port), AppHandler)
     print(f"MasterShield AI running at http://{args.host}:{args.port}")
-    print(f"Model: hybrid-logit-c{ENGINE.cycle} | F1 {ENGINE.metrics['f1']:.3f} | AUC {ENGINE.metrics['auc']:.3f}")
+    print(f"Model: {ENGINE.active_model_version or 'unversioned'} | F1 {ENGINE.metrics['f1']:.3f} | AUC {ENGINE.metrics['auc']:.3f} | p95 {ENGINE._p95_latency():.2f} ms")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
