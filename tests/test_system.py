@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+import tempfile
 import unittest
 from io import BytesIO
 from pathlib import Path
@@ -8,6 +10,10 @@ from pathlib import Path
 from sentinel import DefenseEngine
 from sentinel.features import FEATURES, vectorize
 from sentinel.generator import SyntheticGenerator
+from sentinel.attacker import AdaptiveAttacker
+from sentinel.fidelity import compare_streams
+from sentinel.policy import RiskPolicy
+from sentinel.storage import EventStore
 from sentinel.taxonomy import ATTACKS, ATTACK_BY_ID
 from app import app
 
@@ -59,6 +65,40 @@ class GeneratorTests(unittest.TestCase):
         self.assertTrue(all(isinstance(value, float) for value in values))
 
 
+class NewCapabilityTests(unittest.TestCase):
+    def test_adaptive_attacker_is_seeded_and_safe(self) -> None:
+        row = SyntheticGenerator(4).generate_attacks(1, ["atk-001"])[0]
+        attacker = AdaptiveAttacker(77)
+        first = attacker.mutate(row, count=3)
+        second = AdaptiveAttacker(77).mutate(row, count=3)
+        self.assertEqual(first, second)
+        self.assertTrue(all(candidate[0]["synthetic_only"] for candidate in first))
+        self.assertTrue(all(candidate[0]["label"] == 1 for candidate in first))
+
+    def test_fidelity_report_is_synthetic_and_bounded(self) -> None:
+        first = SyntheticGenerator(1).generate_mixed(20)
+        second = SyntheticGenerator(2).generate_mixed(20)
+        report = compare_streams(first, second)
+        self.assertTrue(report["synthetic_evidence"])
+        self.assertGreaterEqual(report["mean_feature_distance"], 0)
+        self.assertLessEqual(report["mean_feature_distance"], 1)
+
+    def test_policy_exposes_operational_actions(self) -> None:
+        policy = RiskPolicy()
+        decision = policy.decide({"amount": 2500, "new_payee": 1, "rail": "instant_transfer"}, 0.95)
+        self.assertEqual("decline", decision.action)
+        self.assertIn("notify_analyst", decision.controls)
+
+    def test_event_store_memory_and_sqlite(self) -> None:
+        memory = EventStore()
+        memory.append("audit", {"event": "test"})
+        self.assertEqual("test", memory.list("audit")[0]["payload"]["event"])
+        with tempfile.NamedTemporaryFile(suffix=".db") as handle:
+            sqlite_store = EventStore(handle.name)
+            sqlite_store.append("models", {"cycle": 2})
+            self.assertEqual(2, sqlite_store.list("models")[0]["payload"]["cycle"])
+
+
 class ClosedLoopTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -92,13 +132,31 @@ class ClosedLoopTests(unittest.TestCase):
         self.assertTrue(training_ids.isdisjoint(holdout_ids))
         self.assertEqual(len(self.engine.holdout_rows), sum(self.engine.overview()["validation"]["risk_distribution"]["legitimate"]) + sum(self.engine.overview()["validation"]["risk_distribution"]["attack"]))
 
+    def test_immutable_holdout_survives_retrain(self) -> None:
+        original_ids = {row["id"] for row in self.engine.immutable_holdout_rows}
+        self.engine.simulate(["atk-001"], count=5)
+        self.engine.retrain()
+        self.assertEqual(original_ids, {row["id"] for row in self.engine.immutable_holdout_rows})
+
+    def test_feedback_buckets_and_mutation_search(self) -> None:
+        run = self.engine.simulate(["atk-001"], count=5)
+        self.assertIn("feedback_buckets", run)
+        result = self.engine.mutate_transaction(attack_id="atk-001", count=3)
+        self.assertEqual(3, result["candidate_count"])
+        self.assertIn("safety", result)
+
+    def test_score_requires_schema(self) -> None:
+        with self.assertRaises(ValueError):
+            self.engine.score_transaction({})
+
 
 class WebArtifactTests(unittest.TestCase):
     def test_web_console_has_all_judge_views(self) -> None:
         html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
-        for view in ("view-overview", "view-attacks", "view-simulate", "view-defense", "view-evidence"):
+        for view in ("view-overview", "view-attacks", "view-simulate", "view-defense", "view-evidence", "view-fidelity"):
             self.assertIn(view, html)
         self.assertIn("independent challenge prototype", html.lower())
+        self.assertIn("run-mutation", html)
 
     def test_vercel_wsgi_entrypoint_serves_health_and_console(self) -> None:
         def request(path: str, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], bytes]:
@@ -122,6 +180,14 @@ class WebArtifactTests(unittest.TestCase):
         self.assertEqual("200 OK", status)
         self.assertEqual("application/json; charset=utf-8", headers["Content-Type"])
         self.assertEqual("ok", json.loads(body)["status"])
+
+        status, headers, body = request("/api/score", "POST", b"{}")
+        self.assertEqual("400 Bad Request", status)
+        self.assertIn("request_id", json.loads(body))
+
+        status, headers, body = request("/api/simulate", "POST", json.dumps({"attack_ids": "atk-001"}).encode())
+        self.assertEqual("400 Bad Request", status)
+        self.assertIn("list of strings", json.loads(body)["error"])
 
         status, headers, body = request("/")
         self.assertEqual("200 OK", status)

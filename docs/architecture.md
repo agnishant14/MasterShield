@@ -11,6 +11,8 @@ flowchart LR
     E --> F{Approve / review / decline}
     E --> G[Explanations + hard cases]
     G --> H[Feedback queue]
+    G --> J[Adaptive mutation search]
+    J --> C
     H --> I[Retraining + threshold calibration]
     I --> E
 ```
@@ -51,3 +53,12 @@ ISO 8583 / ISO 20022 / wallet events
 
 The highest-risk migration items are label delay, cross-bank identity resolution, model drift, and customer-friction measurement. The live version should log reason codes, counterfactuals, and the exact feature snapshot used for each decision.
 
+## Adaptive red-team boundary
+
+`sentinel/attacker.py` searches a bounded feature-mutation space around synthetic attack transactions. It can reduce amount, pace, graph, device, behavioral, identity, language, biometric, and merchant signals to find lower-risk variants. Every candidate is marked `synthetic_only`, carries a mutation path, and stays inside the generated transaction schema. It does not produce phishing copy, credentials, targets, evasion instructions, or live payment actions.
+
+## Evidence and governance
+
+The fidelity endpoint compares synthetic streams using feature distribution distance, scenario-mix distance, profile summaries, low-intensity stress, unseen-family stress, missing-feature stress, and policy friction/loss estimates. The test holdout created during bootstrap is immutable across retraining. The API returns request IDs, validates payloads, and writes audit/model/feedback/simulation events to memory or SQLite.
+
+The production path should replace the in-process store with a managed database/event stream, use tokenized identifiers, enforce role-based access and retention, and run the model in shadow mode before any payment action is enabled.

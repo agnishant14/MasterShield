@@ -7,6 +7,8 @@ const state = {
   feedbackQueued: 0,
   transactionIndex: new Map(),
   connectionMode: "loading",
+  fidelity: null,
+  mutation: null,
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -99,6 +101,7 @@ function switchView(viewName) {
   if (viewName === "simulate") renderScenarioPicker();
   if (viewName === "defense") renderDefense();
   if (viewName === "overview" && state.overview) requestAnimationFrame(() => drawBoundaryChart(state.overview));
+  if (viewName === "fidelity" && !state.fidelity) loadFidelity();
 }
 
 function decisionHTML(decision) {
@@ -244,13 +247,28 @@ function renderAttackTable() {
         <td><span class="tx-main">${escapeHTML(attack.rail)}</span><span class="tx-sub">${escapeHTML(attack.channel)}</span></td>
         <td><span class="genai-copy">${escapeHTML(attack.genai_role)}</span></td>
         <td><div class="detection-meter"><div class="risk-track"><span style="width:${detection * 100}%"></span></div><b class="mono">${attack.detection_rate == null ? "—" : pct(detection, 0)}</b></div></td>
-        <td><button class="table-action" data-attack-run="${escapeHTML(attack.id)}" title="Simulate ${escapeHTML(attack.name)}" aria-label="Simulate ${escapeHTML(attack.name)}"><i data-lucide="play"></i></button></td>
+        <td><button class="table-action" data-attack-detail="${escapeHTML(attack.id)}" title="Inspect ${escapeHTML(attack.name)}" aria-label="Inspect ${escapeHTML(attack.name)}"><i data-lucide="scan-eye"></i></button><button class="table-action" data-attack-run="${escapeHTML(attack.id)}" title="Simulate ${escapeHTML(attack.name)}" aria-label="Simulate ${escapeHTML(attack.name)}"><i data-lucide="play"></i></button></td>
       </tr>`;
   }).join("") : `<tr><td colspan="6" class="empty-table">No scenarios match this search. Clear the query or choose All.</td></tr>`;
   $$('[data-attack-run]').forEach((button) => button.addEventListener("click", () => {
     state.selectedAttacks = new Set([button.dataset.attackRun]);
     switchView("simulate");
   }));
+  $$('[data-attack-detail]').forEach((button) => button.addEventListener("click", () => openAttackDialog(button.dataset.attackDetail)));
+  refreshIcons();
+}
+
+function openAttackDialog(attackId) {
+  const attack = state.attacks.find((item) => item.id === attackId);
+  if (!attack) return;
+  $("#attack-dialog-title").textContent = attack.name;
+  $("#attack-dialog-content").innerHTML = `
+    <div class="detail-metrics"><div><span>SEVERITY</span><strong>${escapeHTML(attack.severity)}</strong></div><div><span>RAIL</span><strong>${escapeHTML(attack.rail)}</strong></div><div><span>READINESS</span><strong>${escapeHTML(attack.readiness || "simulated")}</strong></div></div>
+    <section class="detail-section"><span>WHY IT MATTERS</span><p>${escapeHTML(attack.description)}</p></section>
+    <section class="detail-section"><span>SIMULATION RECIPE</span><p>${escapeHTML(attack.simulation_recipe)}</p></section>
+    <section class="detail-section"><span>LEADING SIGNALS</span><div class="reason-list">${(attack.leading_signals || []).map((item) => `<div class="reason-row"><span>${escapeHTML(item)}</span><b>signal</b></div>`).join("")}</div></section>
+    <section class="detail-section"><span>MITIGATIONS</span><div class="reason-list">${(attack.mitigations || []).map((item) => `<div class="reason-row"><span>${escapeHTML(item)}</span><b>control</b></div>`).join("")}</div></section>`;
+  $("#attack-dialog").showModal();
   refreshIcons();
 }
 
@@ -292,6 +310,31 @@ function renderSimulationResult(result) {
   $("#loop-queue").textContent = `${result.feedback_ready} rows`;
 }
 
+function renderFidelity(data) {
+  state.fidelity = data;
+  $("#fidelity-distance").textContent = Number(data.mean_feature_distance || 0).toFixed(3);
+  $("#fidelity-scenario-distance").textContent = Number(data.scenario_mix_distance || 0).toFixed(3);
+  $("#fidelity-unseen-recall").textContent = pct(data.robustness?.unseen_attack_families?.attack_recall || 0);
+  $("#fidelity-friction").textContent = Number(data.policy_tradeoff?.estimated_customer_friction || 0).toFixed(3);
+  const robustness = data.robustness || {};
+  const rows = [
+    ["Known low-intensity", robustness.known_low_intensity],
+    ["Unseen attack families", robustness.unseen_attack_families],
+    ["Missing features", robustness.missing_features],
+    ["Legitimate baseline", robustness.legitimate_baseline],
+  ];
+  $("#robustness-list").innerHTML = rows.map(([label, value]) => `<div class="importance-row"><span>${label}</span><div class="importance-bar"><i style="width:${Math.max(3, Number(value?.attack_recall || 0) * 100)}%"></i></div><b>${pct(value?.attack_recall || 0)}</b></div>`).join("");
+  const policy = data.policy_tradeoff || {};
+  $("#policy-tradeoff").innerHTML = `<div class="importance-row"><span>Actions</span><div class="importance-bar"><i style="width:100%"></i></div><b>${Object.values(policy.actions || {}).reduce((sum, item) => sum + item, 0)}</b></div><div class="importance-row"><span>Expected loss</span><div class="importance-bar"><i style="width:${Math.min(100, Number(policy.estimated_expected_loss || 0) / 100)}%"></i></div><b>${Number(policy.estimated_expected_loss || 0).toFixed(2)}</b></div><div class="importance-row"><span>Customer friction</span><div class="importance-bar"><i style="width:${Math.min(100, Number(policy.estimated_customer_friction || 0) * 100)}%"></i></div><b>${Number(policy.estimated_customer_friction || 0).toFixed(3)}</b></div>`;
+}
+
+function renderMutation(data) {
+  state.mutation = data;
+  const candidates = data.candidates || [];
+  $("#mutation-result").className = "sample-list";
+  $("#mutation-result").innerHTML = `<div class="fidelity-strip"><strong>Safety boundary:</strong> ${escapeHTML(data.safety || "synthetic feature mutations only")}</div><div class="sample-row"><div class="sample-name"><strong>Original ${escapeHTML(data.original?.id || "attack")}</strong><span>${escapeHTML(data.original?.attack_id || "synthetic attack")} / ${pct(data.original?.risk_score || 0)} risk</span></div><div class="sample-risk">${data.blind_spots || 0} blind spots</div><span class="decision review">SEARCHED</span></div>${candidates.map((candidate) => `<div class="sample-row"><div class="sample-name"><strong>${escapeHTML(candidate.transaction?.mutation_id || "candidate")}</strong><span>${(candidate.mutations || []).map((item) => escapeHTML(item.feature)).join(" + ")}</span></div><div class="sample-risk">${pct(candidate.risk_score)} risk</div><span class="decision ${candidate.detected ? "decline" : "approve"}">${candidate.detected ? "DETECTED" : "BLIND SPOT"}</span></div>`).join("")}`;
+}
+
 function openTransactionDialog(transactionId) {
   const row = state.transactionIndex.get(transactionId);
   if (!row) return;
@@ -301,8 +344,18 @@ function openTransactionDialog(transactionId) {
     <div class="detail-metrics"><div><span>RISK SCORE</span><strong>${pct(row.risk_score, 0)}</strong></div><div><span>AMOUNT</span><strong>${money(row.amount, row.currency)}</strong></div><div><span>CONTEXT</span><strong>${escapeHTML(row.rail)} / ${escapeHTML(row.channel)}</strong></div></div>
     <section class="detail-section"><span>PAYMENT CONTEXT</span><p>${escapeHTML(row.attack_name || "Legitimate payment baseline")} / ${escapeHTML(row.country || "unknown country")}</p></section>
     <section class="detail-section"><span>REASON CODES</span>${explanations.length ? `<div class="reason-list">${explanations.map((item) => `<div class="reason-row"><span>${escapeHTML(item.label)}</span><div class="reason-bar"><i style="width:${Math.min(100, Math.max(8, Number(item.contribution || 0) * 32))}%"></i></div><b>${Number(item.contribution || 0).toFixed(2)}</b></div>`).join("")}</div>` : "<p>No elevated model contribution crossed the explanation floor.</p>"}</section>
-    <section class="detail-section"><span>RECOMMENDED ACTION</span><p>${row.decision === "approve" ? "Approve and continue monitoring." : row.decision === "decline" ? "Decline and retain the model reasons for review." : "Step up or route to analyst review before authorization."}</p></section>`;
+    <section class="detail-section"><span>RECOMMENDED ACTION</span><p>${row.decision === "approve" ? "Approve and continue monitoring." : row.decision === "decline" ? "Decline and retain the model reasons for review." : "Step up or route to analyst review before authorization."}</p></section>
+    <section class="detail-section"><span>ANALYST OUTCOME</span><div class="segmented feedback-actions"><button data-feedback-outcome="confirmed_fraud" type="button">CONFIRMED FRAUD</button><button data-feedback-outcome="confirmed_legitimate" type="button">LEGITIMATE</button><button data-feedback-outcome="uncertain" type="button">UNCERTAIN</button></div></section>`;
   $("#transaction-dialog").showModal();
+  $$('[data-feedback-outcome]', $("#transaction-dialog-content")).forEach((button) => button.addEventListener("click", async () => {
+    try {
+      await requestJSON("/api/feedback", { method: "POST", body: JSON.stringify({ transaction_id: row.id, outcome: button.dataset.feedbackOutcome }) });
+      toast(`Analyst outcome recorded for ${row.id}.`);
+      button.parentElement.querySelectorAll("button").forEach((item) => item.disabled = true);
+    } catch (error) {
+      toast(`Feedback failed: ${error.message}`);
+    }
+  }));
   refreshIcons();
 }
 
@@ -347,6 +400,48 @@ async function loadData() {
   } catch (error) {
     setConnectionStatus("error");
     toast(`Could not load the defense lab: ${error.message}`);
+  }
+}
+
+async function loadFidelity() {
+  try {
+    const result = await requestJSON("/api/fidelity");
+    renderFidelity(result);
+  } catch (error) {
+    toast(`Evidence run failed: ${error.message}`);
+  }
+}
+
+async function exportReport() {
+  try {
+    const report = await requestJSON("/api/report");
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `mastershield-synthetic-report-c${report.cycle}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast("Synthetic evaluation report exported.");
+  } catch (error) {
+    toast(`Export failed: ${error.message}`);
+  }
+}
+
+async function runMutation() {
+  const button = $("#run-mutation");
+  const oldHTML = button.innerHTML;
+  button.disabled = true;
+  button.textContent = "Searching synthetic variants...";
+  try {
+    const result = await requestJSON("/api/mutate", { method: "POST", body: JSON.stringify({ count: 24 }) });
+    renderMutation(result);
+    toast(`${result.blind_spots} synthetic blind spots found in ${result.candidate_count} candidates.`);
+  } catch (error) {
+    toast(`Mutation search failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.innerHTML = oldHTML;
+    refreshIcons();
   }
 }
 
@@ -436,6 +531,9 @@ function bindEvents() {
   }));
   $("#run-simulation").addEventListener("click", runSimulation);
   $("#retrain-button").addEventListener("click", retrainModel);
+  $("#refresh-fidelity").addEventListener("click", loadFidelity);
+  $("#export-report").addEventListener("click", exportReport);
+  $("#run-mutation").addEventListener("click", runMutation);
   $("#refresh-overview").addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -451,6 +549,7 @@ function bindEvents() {
   });
   $$('[data-dialog-close]').forEach((button) => button.addEventListener("click", () => $("#" + button.dataset.dialogClose).close()));
   $("#transaction-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
+  $("#attack-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
   window.addEventListener("resize", () => state.overview && $("#view-overview").classList.contains("active") && drawBoundaryChart(state.overview));
 }
 

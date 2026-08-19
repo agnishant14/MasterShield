@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import random
+import time
 from dataclasses import dataclass
 
 from .features import FEATURE_LABELS, FEATURES, vectorize
@@ -14,7 +15,7 @@ def _sigmoid(value: float) -> float:
     return 1.0 / (1.0 + math.exp(-value))
 
 
-def classification_metrics(labels: list[int], scores: list[float], threshold: float) -> dict:
+def classification_metrics(labels: list[int], scores: list[float], threshold: float, include_curves: bool = True) -> dict:
     tp = fp = tn = fn = 0
     for label, score in zip(labels, scores):
         pred = int(score >= threshold)
@@ -33,17 +34,62 @@ def classification_metrics(labels: list[int], scores: list[float], threshold: fl
     accuracy = (tp + tn) / max(1, len(labels))
     fpr = fp / (fp + tn) if fp + tn else 0.0
     auc = roc_auc(labels, scores)
+    pr_auc = precision_recall_auc(labels, scores) if include_curves else 0.0
+    brier = sum((score - label) ** 2 for label, score in zip(labels, scores)) / max(1, len(labels)) if include_curves else 0.0
+    recall_at_fpr = recall_at_false_positive_rate(labels, scores, 0.035) if include_curves else 0.0
     return {
         "precision": round(precision, 4),
         "recall": round(recall, 4),
         "f1": round(f1, 4),
         "auc": round(auc, 4),
+        "pr_auc": round(pr_auc, 4),
+        "brier_score": round(brier, 4),
+        "recall_at_fpr_3_5": round(recall_at_fpr, 4),
         "accuracy": round(accuracy, 4),
         "specificity": round(specificity, 4),
         "false_positive_rate": round(fpr, 4),
         "threshold": round(threshold, 3),
         "confusion_matrix": {"tp": tp, "fp": fp, "tn": tn, "fn": fn},
     }
+
+
+def precision_recall_auc(labels: list[int], scores: list[float]) -> float:
+    """Trapezoidal area under the precision-recall curve."""
+    points = []
+    for threshold in sorted(set(scores), reverse=True):
+        predicted = [int(score >= threshold) for score in scores]
+        tp = sum(label == 1 and pred == 1 for label, pred in zip(labels, predicted))
+        fp = sum(label == 0 and pred == 1 for label, pred in zip(labels, predicted))
+        fn = sum(label == 1 and pred == 0 for label, pred in zip(labels, predicted))
+        precision = tp / max(1, tp + fp)
+        recall = tp / max(1, tp + fn)
+        points.append((recall, precision))
+    points.sort()
+    return sum((right[0] - left[0]) * (left[1] + right[1]) / 2 for left, right in zip(points, points[1:])) if len(points) > 1 else 0.0
+
+
+def recall_at_false_positive_rate(labels: list[int], scores: list[float], max_fpr: float) -> float:
+    best = 0.0
+    for threshold in [index / 100 for index in range(1, 100)]:
+        metrics = classification_metrics_basic(labels, scores, threshold)
+        if metrics["fpr"] <= max_fpr:
+            best = max(best, metrics["recall"])
+    return best
+
+
+def classification_metrics_basic(labels: list[int], scores: list[float], threshold: float) -> dict:
+    tp = fp = tn = fn = 0
+    for label, score in zip(labels, scores):
+        pred = int(score >= threshold)
+        if label and pred:
+            tp += 1
+        elif not label and pred:
+            fp += 1
+        elif not label and not pred:
+            tn += 1
+        else:
+            fn += 1
+    return {"fpr": fp / max(1, fp + tn), "recall": tp / max(1, tp + fn)}
 
 
 def roc_auc(labels: list[int], scores: list[float]) -> float:
@@ -92,7 +138,7 @@ class HybridFraudDetector:
     def _standardize(self, values: list[float]) -> list[float]:
         return [(value - mean) / scale for value, mean, scale in zip(values, self.means, self.scales)]
 
-    def fit(self, rows: list[dict], epochs: int = 145, learning_rate: float = 0.055, l2: float = 0.018) -> FitSummary:
+    def fit(self, rows: list[dict], epochs: int = 105, learning_rate: float = 0.055, l2: float = 0.018) -> FitSummary:
         if not rows:
             raise ValueError("Training requires at least one row")
         matrix = [vectorize(row) for row in rows]
@@ -170,7 +216,7 @@ class HybridFraudDetector:
         best = None
         for index in range(18, 93):
             threshold = index / 100
-            metrics = classification_metrics(labels, scores, threshold)
+            metrics = classification_metrics(labels, scores, threshold, include_curves=False)
             if metrics["false_positive_rate"] <= max_false_positive_rate:
                 objective = metrics["f1"] + 0.08 * metrics["recall"]
                 if best is None or objective > best[0]:
@@ -209,9 +255,10 @@ class HybridFraudDetector:
 
     def score_and_annotate(self, row: dict) -> dict:
         annotated = dict(row)
+        started = time.perf_counter()
         risk = self.score(row)
         annotated["risk_score"] = round(risk, 4)
         annotated["decision"] = "decline" if risk >= max(0.82, self.threshold + 0.18) else "review" if risk >= self.threshold else "approve"
         annotated["explanations"] = self.explain(row)
+        annotated["scoring_latency_ms"] = round((time.perf_counter() - started) * 1000, 4)
         return annotated
-

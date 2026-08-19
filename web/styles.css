@@ -381,7 +381,7 @@ tbody tr:hover { background: #fbfaf8; }
   .app-shell { display: block; }
   .sidebar { position: fixed; inset: auto 0 0; width: 100%; height: 60px; border: 0; border-top: 1px solid #34373a; z-index: 30; }
   .brand-lockup, .tenant-stamp, .sidebar-bottom { display: none; }
-  .nav-list { height: 60px; grid-template-columns: repeat(5, 1fr); padding: 5px 4px; gap: 2px; }
+  .nav-list { height: 60px; grid-template-columns: repeat(6, 1fr); padding: 5px 4px; gap: 2px; }
   .nav-item { min-height: 50px; display: flex; justify-content: center; align-items: center; }
   .nav-item svg { width: 18px; height: 18px; }
   .nav-item.active::before { inset: auto 25% -4px; width: 50%; height: 3px; }
