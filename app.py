@@ -111,7 +111,10 @@ def _csv_response(rows: list[dict], request_id: str | None = None) -> tuple[int,
 
 
 def _static_response(relative: str) -> tuple[int, list[tuple[str, str]], bytes]:
-    requested = (WEB_ROOT / relative.lstrip("/")).resolve()
+    # Browsers commonly request /favicon.ico even when the document declares an SVG icon.
+    # Serve the existing branded SVG through that compatibility path as well.
+    static_relative = "/favicon.svg" if _normalize_path(relative) == "/favicon.ico" else relative
+    requested = (WEB_ROOT / static_relative.lstrip("/")).resolve()
     web_root = WEB_ROOT.resolve()
     if web_root not in requested.parents and requested != web_root:
         return _json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
@@ -283,7 +286,8 @@ class AppHandler(BaseHTTPRequestHandler):
         _structured_log("http_request", method=self.command, path=_normalize_path(urlparse(self.path).path), request_id=getattr(self, "request_id", None), status=int(status), duration_ms=round((time.perf_counter() - started) * 1000, 3) if started else None)
 
     def _static(self, relative: str) -> None:
-        requested = (WEB_ROOT / relative.lstrip("/")).resolve()
+        static_relative = "/favicon.svg" if _normalize_path(relative) == "/favicon.ico" else relative
+        requested = (WEB_ROOT / static_relative.lstrip("/")).resolve()
         if WEB_ROOT.resolve() not in requested.parents and requested != WEB_ROOT.resolve():
             self.send_error(HTTPStatus.NOT_FOUND)
             return

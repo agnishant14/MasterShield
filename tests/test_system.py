@@ -289,6 +289,11 @@ class WebArtifactTests(unittest.TestCase):
         self.assertIn("audit", health["capabilities"])
         self.assertTrue(health["api_version"])
 
+        status, headers, body = request("/favicon.ico")
+        self.assertEqual("200 OK", status)
+        self.assertIn("image/svg+xml", headers["Content-Type"])
+        self.assertIn(b"<svg", body)
+
         status, headers, body = request("/api/models")
         self.assertEqual("200 OK", status)
         self.assertTrue(json.loads(body)["models"])
