@@ -1,90 +1,102 @@
 # MasterShield AI
 
-MasterShield AI is a closed-loop red-team / blue-team payment-security prototype for the Mastercard Innovation Challenge @ GFF 2026.
+### Identify. Generate. Defend.
 
-It treats fraud discovery, attack simulation, and defense as one system:
+MasterShield is a closed-loop payment-security lab for discovering GenAI-enabled fraud, generating realistic synthetic attacks, and improving an explainable defense model through feedback.
+
+> Built for the Mastercard Innovation Challenge. All metrics and transactions in this prototype are synthetic evidence—not production claims.
+
+## The core idea
 
 ```text
-24 attack hypotheses -> correlated synthetic payment stream -> explainable detector
-         ^                                                   |
-         |---------------- hard-case feedback ---------------|
+24 attack hypotheses → correlated payment stream → explainable risk decision
+          ↑                                      ↓
+          └──────────── hard cases + feedback ───┘
 ```
 
-The prototype is intentionally dependency-light. The backend, synthetic generator, model, API, and test suite use Python's standard library. The web console is plain HTML/CSS/JavaScript so a judge can run it without a frontend build step.
+## Architecture
 
-## Submission Scope
+```mermaid
+flowchart LR
+    A[Identify\n24 attack scenarios] --> B[Generate\nseeded correlated events]
+    B --> C[Enrich\n24 model features]
+    C --> D[Defend\nhybrid detector]
+    D --> E[Policy\napprove / review / decline]
+    D --> F[Explain\nreason codes + hard cases]
+    F --> G[Feedback queue]
+    G --> H[Retrain challenger]
+    H --> I{Promotion gates}
+    I -->|pass| D
+    I -->|reject| J[Registry + rollback]
+    D --> K[Fidelity + robustness evidence]
+```
 
-This repository is the runnable code submission for the Mastercard challenge. The tracked tree is intentionally limited to the product runtime, the Identify / Generate / Defend implementation, the browser console, reproducibility helpers, tests, deployment configuration, and reviewer documentation.
+### How it works
 
-Generated datasets, model reports, SQLite files, caches, build output, secrets, and local environment files are ignored by Git and are created only when a command explicitly requests them. `web/demo-data.js` is retained as a small deterministic offline snapshot so the console can still be reviewed by opening `web/index.html` directly.
+1. **Identify** — `sentinel/taxonomy.py` defines 24 attack hypotheses across cards, wallets, RTP, QR, acquiring, identity, refunds, and social engineering.
+2. **Generate** — `sentinel/generator.py` creates deterministic legitimate and attack transactions with correlated velocity, device, graph, identity, session, biometric, and language signals.
+3. **Defend** — `sentinel/model.py` combines a weighted logistic model with transparent domain priors, calibrates a low-false-positive threshold, and returns feature-level explanations.
+4. **Learn** — missed attacks, false positives, and analyst outcomes become hard cases for the next challenger model.
+5. **Govern** — immutable holdout, robustness checks, promotion gates, model versions, audit events, and rollback keep the loop reviewable.
 
-## What Is Implemented
+## Console wireframe
 
-- **Identify:** 24 emerging GenAI-enabled payment attack hypotheses spanning CNP cards, RTP / bank transfers, wallets, QR, acquiring, merchant abuse, refunds, identity, and social engineering.
-- **Generate:** a seeded simulator that produces legitimate baselines and attack streams with correlated amount, velocity, device, account, identity, graph, biometric, session, remote-access, merchant, and generated-language signals.
-- **Defend:** a from-scratch weighted logistic detector blended with a small high-confidence domain-prior layer. The model calibrates a threshold under a false-positive guardrail and returns feature-level explanations.
-- **Learn:** false negatives and simulator feedback are promoted into the next training frontier. Holdout evaluation data remains separate.
-- **Adapt:** a safe deterministic red-team composer mutates synthetic attacks, searches for lower-risk variants, and records the mutation path.
-- **Measure:** fidelity, robustness, PR-AUC, calibration, recall at a fixed FPR, policy trade-offs, and measured scoring latency are exposed as synthetic evidence.
-- **Operate:** typed feedback buckets, policy actions, request IDs, schema validation, audit events, and optional SQLite persistence support a production-shaped workflow.
-- **Govern:** challenger models are evaluated against the immutable holdout and robustness gates before promotion; approved snapshots can be rolled back and compared through the model API.
-- **Quality:** dataset-health checks report missing fields, non-finite features, duplicate IDs, label balance, zero-variance columns, and measured drift.
-- **Prototype:** an original Mastercard-inspired operations console with overview, attack intelligence, simulation lab, defense evidence, and judge-ready feasibility views.
+```text
+┌──────────────────┬─────────────────────────────────────────────────────────┐
+│ MASTERSHIELD     │  LIVE API     MODEL hybrid-logit-c02     0 queued        │
+│                  ├─────────────────────────────────────────────────────────┤
+│  Overview        │  F1 SCORE   ROC AUC   FPR       ATTACK COVERAGE          │
+│  Attack intel    │  ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐       │
+│  Simulation lab  │  │ 0.998  │ │ 1.000  │ │ 0.1%   │ │ 17 / 24      │       │
+│  Defense model   │  └────────┘ └────────┘ └────────┘ └──────────────┘       │
+│  Validation      │                                                         │
+│  Fidelity        │  Red team → Generate → Defend → Learn                   │
+│                  │  ┌────────────────────┐ ┌───────────────────────────┐  │
+│  LOOP ACTIVE     │  │ risk distribution   │ │ recent payment decisions │  │
+│  Cycle 02        │  │ legitimate / attack│ │ rail • amount • risk      │  │
+│                  │  └────────────────────┘ └───────────────────────────┘  │
+└──────────────────┴─────────────────────────────────────────────────────────┘
+```
 
-## Run It
+The UI includes animated metrics, attack search and filters, judge-ready simulation presets, transaction explanations, feedback capture, fidelity checks, mutation search, and model rollback.
 
-Requires Python 3.10+.
+## Run locally
+
+Requires Python 3.10+; no mandatory third-party packages.
 
 ```bash
 python3 app.py
 ```
 
-Then open [http://127.0.0.1:8765](http://127.0.0.1:8765).
+Open <http://127.0.0.1:8765>. For a static review, open [`web/index.html`](web/index.html) directly; it uses the bundled offline snapshot.
 
-For a zero-setup visual review, open `web/index.html` directly. This uses the bundled synthetic snapshot and labels write actions as unavailable until the Python server is running.
-
-Optional flags:
+Useful commands:
 
 ```bash
-python3 app.py --host 0.0.0.0 --port 8765
+make test       # 29 deterministic tests
+make report     # write a synthetic model report to work/
+make dataset    # export reproducible JSONL to data/
 ```
 
-## Deploy to Vercel
-
-The repository includes a Vercel configuration and a WSGI entrypoint in `app.py`. From the project directory:
+Optional persistence:
 
 ```bash
-npx vercel login
-npx vercel
+MASTERSHIELD_DB=work/mastershield.db python3 app.py
 ```
 
-Use `npx vercel --prod` when you are ready to promote the deployment to a production URL. Vercel will detect `requirements.txt`, build the Python function, and route both the API and the `web/` console through the same entrypoint.
-
-This deployment is suitable for demos and reviews. `DefenseEngine` keeps feedback, transactions, and model state in process memory, so Vercel cold starts or multiple serverless instances can reset or diverge from that state. A production rollout should move those stores to durable infrastructure such as Vercel KV, Postgres, or another managed database.
-
-The first boot trains two model cycles so the overview can show hard-case mining. On a modern laptop this usually takes a few seconds.
-
-## API Surface
+## Key API
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /api/health` | Liveness and model version |
-| `GET /api/overview` | KPIs, history, recent stream, feature importance |
-| `GET /api/attacks` | Full 24-scenario attack catalog with live detection rates |
-| `GET /api/transactions?limit=100` | Recent annotated decisions |
-| `POST /api/simulate` | Generate and score an attack stream |
-| `POST /api/retrain` | Train on queued simulator feedback and hard cases |
-| `POST /api/score` | Score one transaction-shaped JSON object |
-| `GET /api/fidelity` | Synthetic fidelity, robustness, and policy evidence |
-| `POST /api/mutate` | Search safe synthetic mutations for detector blind spots |
-| `POST /api/feedback` | Submit an analyst outcome for a scored transaction |
-| `GET /api/simulations` | Review recent simulation runs |
-| `GET /api/report` | Export a synthetic evaluation report |
-| `GET /api/models` | Model versions, statuses, gates, and active version |
-| `POST /api/models/rollback` | Restore an in-memory model snapshot by version |
-| `GET /api/audit` | Structured audit events (bounded, redacted) |
-
-Append `?format=csv` to `/api/report` or `/api/simulations` for a flat CSV export. JSON remains the default.
+| `GET /api/overview` | KPIs, stream, history, feature importance |
+| `GET /api/attacks` | Attack catalog and live detection rates |
+| `POST /api/simulate` | Generate and score an adversarial stream |
+| `POST /api/score` | Score one payment-shaped transaction |
+| `POST /api/feedback` | Record an analyst outcome |
+| `POST /api/retrain` | Build and evaluate a challenger model |
+| `GET /api/fidelity` | Fidelity, robustness, and policy evidence |
+| `GET /api/models` | Model registry and promotion status |
+| `POST /api/models/rollback` | Restore a retained model snapshot |
 
 Example:
 
@@ -94,55 +106,27 @@ curl -X POST http://127.0.0.1:8765/api/simulate \
   -d '{"attack_ids":["atk-001","atk-005","atk-008"],"count":120,"intensity":1.1}'
 ```
 
-## Repository Map
+## Repository map
 
 ```text
-app.py                    # no-dependency HTTP API + static-file server
-sentinel/taxonomy.py      # 24 attack hypotheses and mitigations
-sentinel/generator.py     # seeded correlated transaction simulator
-sentinel/features.py      # raw-to-model feature transformation
-sentinel/model.py         # weighted logistic model, calibration, explanations
-sentinel/engine.py        # closed-loop orchestration and API-ready state
-sentinel/attacker.py      # adaptive synthetic mutation search
-sentinel/fidelity.py      # fidelity and robustness measurements
-sentinel/policy.py        # configurable operational actions
-sentinel/storage.py       # memory / optional SQLite event store
-web/                      # operations console
-tests/                    # deterministic unit and integration-style tests
-scripts/                  # dataset export and model report helpers
-docs/                     # architecture notes and demo runbook
+app.py                 HTTP / WSGI server and API routing
+sentinel/taxonomy.py   attack intelligence catalog
+sentinel/generator.py  seeded synthetic transaction generator
+sentinel/model.py      explainable hybrid fraud detector
+sentinel/engine.py     closed-loop orchestration
+sentinel/attacker.py   bounded synthetic blind-spot search
+sentinel/fidelity.py   robustness and fidelity measurements
+sentinel/governance.py challenger promotion and rollback gates
+web/                   interactive operations console
+scripts/               dataset, report, and offline-demo builders
+tests/                 deterministic system tests
+docs/                  architecture and demo runbook
 ```
 
-## Evaluation Notes
+## Safety boundary
 
-The numbers shown in the UI are measured on generated holdout data, not real Mastercard production data. They demonstrate the mechanics of a closed loop and should be presented as simulation results. For a production pilot, replace the generator's schema adapter with tokenized ISO 8583 / ISO 20022 events, add confirmed fraud outcomes, and run a time-based rather than random split.
+The red-team component only mutates synthetic transaction features. It does not generate phishing content, credentials, targets, evasion instructions, or live payment actions. Production integration would replace the simulator with tokenized ISO 8583 / ISO 20022 events, durable storage, access controls, and confirmed fraud labels.
 
-The model intentionally optimizes for a low false-positive rate first. The prototype now includes a transparent policy layer around the model score: approve, step-up, review, hold, and decline are different operational actions and are accompanied by synthetic friction/loss estimates. A production rollout must calibrate those policies against issuer risk appetite, customer impact, regulation, and confirmed outcomes.
+## Demo path
 
-Retraining creates a challenger snapshot, evaluates it on the immutable holdout plus rolling and stress suites, and promotes it only when `sentinel/governance.py` gates pass. Rejected challengers remain visible in `/api/models`; rollback restores the stored detector state and re-scores the current synthetic stream. Analyst feedback is retained in the audit store after queue consumption.
-
-All fidelity, robustness, and model metrics are explicitly synthetic evidence. They are not claims about Mastercard production performance. The immutable holdout is kept separate from feedback retraining; rolling validation and robustness reports expose distribution shift and unseen-attack behavior.
-
-For optional local persistence, set `MASTERSHIELD_DB=work/mastershield.db`. Without it, the event store remains in memory for a dependency-free demo.
-
-## Design Positioning
-
-The interface uses a Mastercard-inspired black / red / amber visual language and overlapping-circle mark, but the product name, layout, copy, and visual components are original. It includes an independent-prototype note so it is clear this is a challenge submission, not an official Mastercard product.
-
-## Test
-
-```bash
-python3 -m unittest discover -s tests -v
-python3 scripts/train_model.py --report work/model-report.json
-python3 scripts/generate_dataset.py --rows 10000 --output data/synthetic_payments.jsonl
-```
-
-## Submission Checklist
-
-- **Identify:** `sentinel/taxonomy.py` contains 24 attack hypotheses with signals and mitigations.
-- **Generate:** `sentinel/generator.py` produces seeded, correlated synthetic payment streams; `scripts/generate_dataset.py` exports JSONL.
-- **Defend:** `sentinel/model.py`, `sentinel/policy.py`, and `sentinel/engine.py` provide explainable scoring, operational decisions, feedback, and retraining.
-- **Evidence:** `/api/fidelity`, `/api/report`, and `/api/models` expose synthetic validation, robustness, and governance evidence.
-- **Safety:** `sentinel/attacker.py` is bounded to synthetic feature mutation and does not create phishing content, credentials, targets, or live payment actions.
-- **Reproducibility:** the application, tests, scripts, and offline snapshot run with Python 3.10+ and no mandatory third-party packages.
-- **Review path:** use [docs/runbook.md](docs/runbook.md) for the 90-second walkthrough and [docs/architecture.md](docs/architecture.md) for the production boundary.
+Open **Overview** → search an attack in **Attack intelligence** → click **Run** → inspect misses and explanations → submit feedback → **Retrain** → review **Validation / Fidelity** → compare model versions or roll back.
