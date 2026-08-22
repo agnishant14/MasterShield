@@ -11,8 +11,12 @@ flowchart LR
     E --> F{Approve / review / decline}
     E --> G[Explanations + hard cases]
     G --> H[Feedback queue]
+    G --> J[Adaptive mutation search]
+    J --> C
     H --> I[Retraining + threshold calibration]
     I --> E
+    I --> K[Promotion gates + model registry]
+    K --> L[Active / rollback snapshot]
 ```
 
 ## Data contract
@@ -51,3 +55,20 @@ ISO 8583 / ISO 20022 / wallet events
 
 The highest-risk migration items are label delay, cross-bank identity resolution, model drift, and customer-friction measurement. The live version should log reason codes, counterfactuals, and the exact feature snapshot used for each decision.
 
+## Adaptive red-team boundary
+
+`sentinel/attacker.py` searches a bounded feature-mutation space around synthetic attack transactions. It can reduce amount, pace, graph, device, behavioral, identity, language, biometric, and merchant signals to find lower-risk variants. Every candidate is marked `synthetic_only`, carries a mutation path, and stays inside the generated transaction schema. It does not produce phishing copy, credentials, targets, evasion instructions, or live payment actions.
+
+## Evidence and governance
+
+The fidelity endpoint compares synthetic streams using feature distribution distance, scenario-mix distance, profile summaries, low-intensity stress, unseen-family stress, missing-feature stress, and policy friction/loss estimates. The test holdout created during bootstrap is immutable across retraining. The API returns request IDs, validates payloads, and writes audit/model/feedback/simulation events to memory or SQLite.
+
+The production path should replace the in-process store with a managed database/event stream, use tokenized identifiers, enforce role-based access and retention, and run the model in shadow mode before any payment action is enabled. The local registry persists metadata and audit events when `MASTERSHIELD_DB` is set; detector snapshots are intentionally memory-local until a signed artifact store is configured.
+
+## Model governance
+
+`DefenseEngine.retrain()` fits a cloned challenger, never the active detector. It records a dataset hash, fit duration, immutable-holdout metrics, rolling time-split metrics, segment metrics, robustness evidence, and promotion-gate results. A candidate must meet minimum F1/recall, the false-positive guardrail, regression tolerances, and unseen-family recall before it becomes active. `GET /api/models` exposes the lifecycle and `POST /api/models/rollback` restores a retained snapshot.
+
+## API and audit boundary
+
+Both the threaded server and WSGI entrypoint use `sentinel/contracts.py` for strict schemas, finite numeric/range checks, unknown-field rejection, request-size limits, and bounded strings. Responses carry a request ID and safe JSON errors. Structured request logs and domain events omit raw customer/device identifiers, credentials, and payment bodies.
