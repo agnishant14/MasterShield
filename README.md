@@ -12,6 +12,12 @@ It treats fraud discovery, attack simulation, and defense as one system:
 
 The prototype is intentionally dependency-light. The backend, synthetic generator, model, API, and test suite use Python's standard library. The web console is plain HTML/CSS/JavaScript so a judge can run it without a frontend build step.
 
+## Submission Scope
+
+This repository is the runnable code submission for the Mastercard challenge. The tracked tree is intentionally limited to the product runtime, the Identify / Generate / Defend implementation, the browser console, reproducibility helpers, tests, deployment configuration, and reviewer documentation.
+
+Generated datasets, model reports, SQLite files, caches, build output, secrets, and local environment files are ignored by Git and are created only when a command explicitly requests them. `web/demo-data.js` is retained as a small deterministic offline snapshot so the console can still be reviewed by opening `web/index.html` directly.
+
 ## What Is Implemented
 
 - **Identify:** 24 emerging GenAI-enabled payment attack hypotheses spanning CNP cards, RTP / bank transfers, wallets, QR, acquiring, merchant abuse, refunds, identity, and social engineering.
@@ -34,6 +40,8 @@ python3 app.py
 ```
 
 Then open [http://127.0.0.1:8765](http://127.0.0.1:8765).
+
+For a zero-setup visual review, open `web/index.html` directly. This uses the bundled synthetic snapshot and labels write actions as unavailable until the Python server is running.
 
 Optional flags:
 
@@ -128,3 +136,13 @@ python3 -m unittest discover -s tests -v
 python3 scripts/train_model.py --report work/model-report.json
 python3 scripts/generate_dataset.py --rows 10000 --output data/synthetic_payments.jsonl
 ```
+
+## Submission Checklist
+
+- **Identify:** `sentinel/taxonomy.py` contains 24 attack hypotheses with signals and mitigations.
+- **Generate:** `sentinel/generator.py` produces seeded, correlated synthetic payment streams; `scripts/generate_dataset.py` exports JSONL.
+- **Defend:** `sentinel/model.py`, `sentinel/policy.py`, and `sentinel/engine.py` provide explainable scoring, operational decisions, feedback, and retraining.
+- **Evidence:** `/api/fidelity`, `/api/report`, and `/api/models` expose synthetic validation, robustness, and governance evidence.
+- **Safety:** `sentinel/attacker.py` is bounded to synthetic feature mutation and does not create phishing content, credentials, targets, or live payment actions.
+- **Reproducibility:** the application, tests, scripts, and offline snapshot run with Python 3.10+ and no mandatory third-party packages.
+- **Review path:** use [docs/runbook.md](docs/runbook.md) for the 90-second walkthrough and [docs/architecture.md](docs/architecture.md) for the production boundary.

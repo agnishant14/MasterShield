@@ -6,6 +6,7 @@ import json
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from pathlib import Path
 
 
 class EventStore:
@@ -15,6 +16,8 @@ class EventStore:
         self.memory: dict[str, list[dict]] = {"feedback": [], "simulations": [], "audit": [], "models": []}
         self.connection = None
         if path:
+            if path != ":memory:":
+                Path(path).expanduser().parent.mkdir(parents=True, exist_ok=True)
             self.connection = sqlite3.connect(path, check_same_thread=False)
             self.connection.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)")
             self.connection.commit()

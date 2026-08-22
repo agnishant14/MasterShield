@@ -260,7 +260,7 @@ function renderTransactions(rows) {
       <td><span class="tx-main">${escapeHTML(row.id)}</span><span class="tx-sub">${escapeHTML(row.attack_name || "legitimate baseline")}</span></td>
       <td><span class="tx-main">${escapeHTML(row.rail)}</span><span class="tx-sub">${escapeHTML(row.channel)}</span></td>
       <td><span class="tx-main">${money(row.amount, row.currency)}</span><span class="tx-sub">${escapeHTML(row.country)}</span></td>
-      <td><div class="risk-cell"><div class="risk-track"><span style="width:${Math.round(row.risk_score * 100)}%"></span></div><b class="mono">${pct(row.risk_score, 0)}</b></div></td>
+      <td><div class="risk-cell"><div class="risk-track"><span style="width:${boundedRatio(row.risk_score) * 100}%"></span></div><b class="mono">${pct(boundedRatio(row.risk_score), 0)}</b></div></td>
       <td>${decisionHTML(row.decision)}</td>
       <td><button class="table-action" data-transaction-detail="${escapeHTML(row.id)}" title="Explain ${escapeHTML(row.id)}" aria-label="Explain ${escapeHTML(row.id)}"><i data-lucide="scan-eye"></i></button></td>
     </tr>

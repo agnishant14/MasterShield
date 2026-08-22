@@ -119,8 +119,8 @@ class NewCapabilityTests(unittest.TestCase):
         memory = EventStore()
         memory.append("audit", {"event": "test"})
         self.assertEqual("test", memory.list("audit")[0]["payload"]["event"])
-        with tempfile.NamedTemporaryFile(suffix=".db") as handle:
-            sqlite_store = EventStore(handle.name)
+        with tempfile.TemporaryDirectory() as directory:
+            sqlite_store = EventStore(str(Path(directory) / "nested" / "events.db"))
             sqlite_store.append("models", {"cycle": 2})
             self.assertEqual(2, sqlite_store.list("models")[0]["payload"]["cycle"])
             sqlite_store.close()
