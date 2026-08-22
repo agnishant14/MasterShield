@@ -64,6 +64,26 @@ function refreshIcons() {
   if (window.lucide) window.lucide.createIcons({ attrs: { "stroke-width": 1.7 } });
 }
 
+function bindRevealMotion() {
+  const targets = $$(".surface, .kpi-cell, .page-title-row, .section-head, .feedback-node, .metric-panel");
+  targets.forEach((node, index) => {
+    node.dataset.reveal = "pending";
+    node.style.setProperty("--reveal-delay", `${Math.min(index * 35, 280)}ms`);
+  });
+  if (!("IntersectionObserver" in window)) {
+    targets.forEach((node) => { node.dataset.reveal = "visible"; });
+    return;
+  }
+  const observer = new IntersectionObserver((entries, instance) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.dataset.reveal = "visible";
+      instance.unobserve(entry.target);
+    });
+  }, { threshold: 0.08 });
+  targets.forEach((node) => observer.observe(node));
+}
+
 function isOfflineDemo() {
   return window.location.protocol === "file:" && Boolean(window.MASTERSHIELD_DEMO);
 }
@@ -747,6 +767,7 @@ function bindEvents() {
 
 document.addEventListener("DOMContentLoaded", () => {
   refreshIcons();
+  bindRevealMotion();
   bindEvents();
   loadData();
   setInterval(() => requestJSON("/api/health").then((health) => {
