@@ -43,6 +43,11 @@ function pct(value, digits = 1) {
   return `${(Number(value || 0) * 100).toFixed(digits)}%`;
 }
 
+function boundedRatio(value) {
+  const number = Number(value);
+  return Math.max(0, Math.min(1, Number.isFinite(number) ? number : 0));
+}
+
 function compactNumber(value) {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value || 0));
 }
@@ -161,6 +166,7 @@ async function requestJSON(url, options = {}) {
 
 function toast(message) {
   const node = $("#toast");
+  if (!node) return;
   node.textContent = message;
   node.classList.add("show");
   clearTimeout(toast.timer);
@@ -172,10 +178,12 @@ function setConnectionStatus(mode) {
   const status = $("#connection-status");
   if (!status) return;
   status.dataset.mode = mode;
-  $("#connection-label").textContent = { loading: "Connecting", live: "Live API", offline: "Offline demo", outdated: "Update required", error: "Unavailable" }[mode];
-  $("#model-status-label").textContent = { loading: "LOADING", live: "LIVE API", offline: "OFFLINE SNAPSHOT", outdated: "OUTDATED API", error: "UNAVAILABLE" }[mode];
-  $("#side-loop-title").innerHTML = `<span class="pulse"></span> ${mode === "live" ? "Closed loop active" : mode === "offline" ? "Static evidence snapshot" : mode === "outdated" ? "Backend update required" : mode === "error" ? "Defense loop unavailable" : "Connecting to model"}`;
-  $("#side-loop-copy").textContent = mode === "live" ? "Simulation feedback is available for the next model cycle." : mode === "offline" ? "Start app.py to run simulations and retraining." : mode === "outdated" ? "Redeploy the current app.py to enable all API-backed controls." : "Loading red-team, model, and feedback state.";
+  const label = { loading: "Connecting", live: "Live API", offline: "Offline demo", outdated: "Update required", error: "Unavailable" }[mode] || "Unavailable";
+  const modelLabel = { loading: "LOADING", live: "LIVE API", offline: "OFFLINE SNAPSHOT", outdated: "OUTDATED API", error: "UNAVAILABLE" }[mode] || "UNAVAILABLE";
+  $("#connection-label") && ($("#connection-label").textContent = label);
+  $("#model-status-label") && ($("#model-status-label").textContent = modelLabel);
+  $("#side-loop-title") && ($("#side-loop-title").innerHTML = `<span class="pulse"></span> ${mode === "live" ? "Closed loop active" : mode === "offline" ? "Static evidence snapshot" : mode === "outdated" ? "Backend update required" : mode === "error" ? "Defense loop unavailable" : "Connecting to model"}`);
+  $("#side-loop-copy") && ($("#side-loop-copy").textContent = mode === "live" ? "Simulation feedback is available for the next model cycle." : mode === "offline" ? "Start app.py to run simulations and retraining." : mode === "outdated" ? "Redeploy the current app.py to enable all API-backed controls." : "Loading red-team, model, and feedback state.");
 }
 
 function updateCapabilities(health) {
@@ -224,6 +232,8 @@ function decisionHTML(decision) {
 
 function renderTransactions(rows) {
   const body = $("#stream-table");
+  if (!body) return;
+  rows = Array.isArray(rows) ? rows : [];
   rows.forEach((row) => state.transactionIndex.set(row.id, row));
   body.innerHTML = rows.slice(0, 8).map((row) => `
     <tr>
@@ -240,8 +250,11 @@ function renderTransactions(rows) {
 }
 
 function renderAttackMix(items) {
+  items = Array.isArray(items) ? items : [];
+  const target = $("#attack-mix");
+  if (!target) return;
   const max = Math.max(1, ...items.map((item) => item.count));
-  $("#attack-mix").innerHTML = items.length ? items.map((item) => `
+  target.innerHTML = items.length ? items.map((item) => `
     <div class="mix-row"><span title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span><div class="mix-bar"><i style="width:${Math.max(6, item.count / max * 100)}%"></i></div><b>${item.count}</b></div>
   `).join("") : `<div class="empty-state" style="min-height:200px"><strong>No active attacks</strong></div>`;
 }
@@ -260,10 +273,10 @@ function drawBoundaryChart(data) {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#fbfaf7";
   ctx.fillRect(0, 0, width, height);
-  const rows = data.validation?.risk_distribution ? data.validation : { risk_distribution: { legitimate: [], attack: [] } };
-  if (!rows.risk_distribution.legitimate.length) return;
-  const legitimate = rows.risk_distribution.legitimate;
-  const attacks = rows.risk_distribution.attack;
+  const distribution = data.validation?.risk_distribution || {};
+  const legitimate = Array.isArray(distribution.legitimate) ? distribution.legitimate : [];
+  const attacks = Array.isArray(distribution.attack) ? distribution.attack : [];
+  if (!legitimate.length || !attacks.length) return;
   const pad = { top: 18, right: 16, bottom: 28, left: 28 };
   const chartWidth = width - pad.left - pad.right;
   const chartHeight = height - pad.top - pad.bottom;
@@ -287,7 +300,7 @@ function drawBoundaryChart(data) {
     ctx.fillStyle = "rgba(217,79,32,.78)";
     ctx.fillRect(x + barWidth + 2, pad.top + chartHeight - attackHeight, barWidth, attackHeight);
   });
-  const threshold = Number(data.metrics?.threshold || .5);
+  const threshold = boundedRatio(data.metrics?.threshold || .5);
   const thresholdX = pad.left + chartWidth * threshold;
   ctx.save();
   ctx.setLineDash([5, 5]);
@@ -308,18 +321,20 @@ function drawBoundaryChart(data) {
 function renderOverview() {
   const data = state.overview;
   if (!data) return;
-  const metrics = data.metrics;
-  const latest = data.history.at(-1);
-  const previous = data.history.at(-2) || latest;
+  const metrics = data.metrics || {};
+  const system = data.system || {};
+  const history = Array.isArray(data.history) ? data.history : [];
+  const latest = history.at(-1) || { f1: metrics.f1 || 0, attack_coverage: data.detected_attack_coverage || 0 };
+  const previous = history.at(-2) || latest;
   const f1Delta = latest.f1 - previous.f1;
   $("#kpi-f1").textContent = pct(metrics.f1);
   $("#kpi-f1-delta").textContent = `${f1Delta >= 0 ? "+" : ""}${pct(f1Delta)} after frontier feedback`;
-  $("#kpi-auc").textContent = metrics.auc.toFixed(3);
+  $("#kpi-auc").textContent = Number(metrics.auc || 0).toFixed(3);
   $("#kpi-fpr").textContent = pct(metrics.false_positive_rate);
   $("#kpi-coverage").textContent = latest.attack_coverage;
   $("#kpi-catalog-size").textContent = data.catalog_size;
-  $("#intro-model").textContent = data.system.model_version;
-  $("#topbar-model").textContent = data.system.model_version;
+  $("#intro-model").textContent = system.model_version || "model unavailable";
+  $("#topbar-model").textContent = system.model_version || "model unavailable";
   $("#intro-time").textContent = new Date(data.generated_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
   $("#last-sync").textContent = `synced ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
   $("#cycle-badge").textContent = `CYCLE ${String(data.cycle).padStart(2, "0")}`;
@@ -332,11 +347,12 @@ function renderOverview() {
   $("#side-feedback").textContent = `${state.feedbackQueued} queued`;
   $("#topbar-feedback").textContent = `${state.feedbackQueued} queued`;
   $("#threshold-value").textContent = Number(metrics.threshold).toFixed(2);
-  $("#latency-p95").textContent = `${Number(data.system?.latency_ms_p95 || 0).toFixed(2)} ms`;
+  $("#latency-p95").textContent = `${Number(system.latency_ms_p95 || 0).toFixed(2)} ms`;
   renderTransactions(data.recent_transactions || []);
   renderAttackMix(data.attack_mix || []);
-  const activeCoverage = data.detected_attack_coverage;
-  $("#coverage-ring").style.setProperty("--coverage", `${activeCoverage / data.catalog_size * 100}%`);
+  const activeCoverage = Number(data.detected_attack_coverage || 0);
+  const catalogSize = Math.max(1, Number(data.catalog_size || 0));
+  $("#coverage-ring").style.setProperty("--coverage", `${boundedRatio(activeCoverage / catalogSize) * 100}%`);
   $("#coverage-ring-value").textContent = `${activeCoverage}/${data.catalog_size}`;
   $("#coverage-title").textContent = activeCoverage === data.catalog_size ? "Full stream coverage" : "Current stream coverage";
   drawBoundaryChart(data);
@@ -345,7 +361,7 @@ function renderOverview() {
 
 function renderAttackTable() {
   const query = ($("#attack-search")?.value || "").trim().toLowerCase();
-  const rows = state.attacks.filter((attack) => {
+  const rows = (Array.isArray(state.attacks) ? state.attacks : []).filter((attack) => {
     const matchesSeverity = state.severityFilter === "all" || attack.severity === state.severityFilter;
     const haystack = `${attack.name} ${attack.family} ${attack.rail} ${attack.channel} ${attack.genai_role}`.toLowerCase();
     return matchesSeverity && haystack.includes(query);
@@ -353,11 +369,11 @@ function renderAttackTable() {
   $("#attack-count").textContent = rows.length;
   $("#attack-count-meta").textContent = `${state.attacks.length} total scenarios in catalog`;
   $("#attack-table-body").innerHTML = rows.length ? rows.map((attack) => {
-    const detection = attack.detection_rate == null ? 0 : attack.detection_rate;
+    const detection = attack.detection_rate == null ? 0 : boundedRatio(attack.detection_rate);
     return `
       <tr>
         <td><span class="attack-name"><i class="severity-dot ${escapeHTML(attack.severity)}"></i>${escapeHTML(attack.name)}</span><span class="attack-id">${escapeHTML(attack.id)} / ${escapeHTML(attack.novelty)} novelty</span></td>
-        <td><span class="family-tag">${escapeHTML(attack.family.replaceAll("_", " "))}</span></td>
+        <td><span class="family-tag">${escapeHTML(String(attack.family || "unknown").replaceAll("_", " "))}</span></td>
         <td><span class="tx-main">${escapeHTML(attack.rail)}</span><span class="tx-sub">${escapeHTML(attack.channel)}</span></td>
         <td><span class="genai-copy">${escapeHTML(attack.genai_role)}</span></td>
         <td><div class="detection-meter"><div class="risk-track"><span style="width:${detection * 100}%"></span></div><b class="mono">${attack.detection_rate == null ? "—" : pct(detection, 0)}</b></div></td>
@@ -388,7 +404,11 @@ function openAttackDialog(attackId) {
 
 function renderScenarioPicker() {
   const container = $("#scenario-picker");
-  container.innerHTML = state.attacks.map((attack) => `
+  if (!container) return;
+  const attacks = Array.isArray(state.attacks) ? state.attacks : [];
+  const summary = $("#scenario-selection-summary");
+  if (summary) summary.textContent = `${state.selectedAttacks.size} selected`;
+  container.innerHTML = attacks.map((attack) => `
     <button class="scenario-option ${state.selectedAttacks.has(attack.id) ? "selected" : ""}" aria-pressed="${state.selectedAttacks.has(attack.id)}" data-scenario-id="${escapeHTML(attack.id)}" type="button">
       <span class="scenario-check">${state.selectedAttacks.has(attack.id) ? "✓" : ""}</span>
       <span><strong>${escapeHTML(attack.name)}</strong><small>${escapeHTML(attack.rail)} / ${escapeHTML(attack.severity)}</small></span>
@@ -415,7 +435,7 @@ function renderSimulationResult(result) {
   $("#result-bar-fill").style.width = `${result.detection_rate * 100}%`;
   const stats = result.scenario_stats || {};
   $("#fidelity-strip").innerHTML = `<strong>Fidelity check:</strong> ${stats.coverage || 0} scenario recipes across ${stats.attacks || result.generated} attack events.`;
-  $("#sim-samples").innerHTML = result.sample.map((row) => `
+  $("#sim-samples").innerHTML = (Array.isArray(result.sample) ? result.sample : []).map((row) => `
     <div class="sample-row"><div class="sample-name"><strong>${escapeHTML(row.attack_name)}</strong><span>${escapeHTML(row.id)} / ${escapeHTML(row.rail)}</span></div><div class="sample-risk">${pct(row.risk_score, 0)} risk</div>${decisionHTML(row.decision)}</div>
   `).join("");
   state.feedbackQueued = result.feedback_ready;
@@ -482,22 +502,23 @@ function openTransactionDialog(transactionId) {
 
 function renderDefense() {
   if (!state.overview) return;
-  const { metrics, feature_importance: importance, history, cycle, system } = state.overview;
+  const { metrics = {}, feature_importance: rawImportance = [], history = [], cycle = 0, system = {} } = state.overview;
+  const importance = Array.isArray(rawImportance) ? rawImportance : [];
   $("#defense-version").textContent = `C${String(cycle).padStart(2, "0")}`;
   $("#def-precision").textContent = pct(metrics.precision);
   $("#def-recall").textContent = pct(metrics.recall);
   $("#def-specificity").textContent = pct(metrics.specificity);
   $("#def-threshold").textContent = Number(metrics.threshold).toFixed(2);
-  const matrix = metrics.confusion_matrix;
+  const matrix = metrics.confusion_matrix || { tp: 0, fn: 0, fp: 0, tn: 0 };
   $("#matrix-tp").textContent = matrix.tp;
   $("#matrix-fn").textContent = matrix.fn;
   $("#matrix-fp").textContent = matrix.fp;
   $("#matrix-tn").textContent = matrix.tn;
   const holdoutSize = Object.values(matrix).reduce((sum, value) => sum + value, 0);
   $("#matrix-footnote").textContent = `Untouched generated holdout / N ${holdoutSize}.`;
-  const maxImportance = Math.max(0.01, ...importance.map((item) => item.importance));
+  const maxImportance = Math.max(0.01, ...importance.map((item) => Number(item.importance || 0)));
   $("#importance-list").innerHTML = importance.slice(0, 10).map((item) => `
-    <div class="importance-row"><span title="${escapeHTML(item.label)}">${escapeHTML(item.label)}</span><div class="importance-bar"><i style="width:${Math.max(3, item.importance / maxImportance * 100)}%"></i></div><b>${item.importance.toFixed(2)}</b></div>
+    <div class="importance-row"><span title="${escapeHTML(item.label)}">${escapeHTML(item.label)}</span><div class="importance-bar"><i style="width:${Math.max(3, Number(item.importance || 0) / maxImportance * 100)}%"></i></div><b>${Number(item.importance || 0).toFixed(2)}</b></div>
   `).join("");
   $("#history-list").innerHTML = history.map((item) => `
     <div class="history-item"><span>CYCLE ${String(item.cycle).padStart(2, "0")}</span><strong>${escapeHTML(item.name)}</strong><div class="history-stats"><span>F1 <b>${pct(item.f1)}</b></span><span>RECALL <b>${pct(item.recall)}</b></span><span>FPR <b>${pct(item.fpr)}</b></span></div></div>
@@ -533,7 +554,7 @@ async function loadData() {
       requestJSON("/api/attacks"),
     ]);
     state.overview = overview;
-    state.attacks = attackPayload.attacks;
+    state.attacks = Array.isArray(attackPayload.attacks) ? attackPayload.attacks : [];
     state.feedbackQueued = Number(overview.feedback_queue_size || 0);
     const currentBackend = updateCapabilities(health);
     setConnectionStatus(isOfflineDemo() ? "offline" : currentBackend ? "live" : "outdated");
@@ -595,7 +616,7 @@ async function runMutation() {
 async function refreshData() {
   const [overview, attackPayload] = await Promise.all([requestJSON("/api/overview"), requestJSON("/api/attacks")]);
   state.overview = overview;
-  state.attacks = attackPayload.attacks;
+  state.attacks = Array.isArray(attackPayload.attacks) ? attackPayload.attacks : [];
   state.feedbackQueued = Number(overview.feedback_queue_size || state.feedbackQueued || 0);
   renderOverview();
   renderAttackTable();
@@ -658,7 +679,7 @@ async function retrainModel() {
 
 function bindEvents() {
   $$('[data-view]').forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
-  $("#attack-search").addEventListener("input", renderAttackTable);
+  $("#attack-search")?.addEventListener("input", renderAttackTable);
   $$(".filter-button").forEach((button) => button.addEventListener("click", () => {
     state.severityFilter = button.dataset.filter;
     $$(".filter-button").forEach((item) => {
@@ -668,7 +689,7 @@ function bindEvents() {
     });
     renderAttackTable();
   }));
-  $("#volume-slider").addEventListener("input", (event) => {
+  $("#volume-slider")?.addEventListener("input", (event) => {
     $("#volume-output").textContent = `${event.target.value} events`;
   });
   $$("#intensity-picker button").forEach((button) => button.addEventListener("click", () => {
@@ -679,12 +700,33 @@ function bindEvents() {
       item.setAttribute("aria-pressed", String(active));
     });
   }));
-  $("#run-simulation").addEventListener("click", runSimulation);
-  $("#retrain-button").addEventListener("click", retrainModel);
-  $("#refresh-fidelity").addEventListener("click", loadFidelity);
-  $("#export-report").addEventListener("click", exportReport);
-  $("#run-mutation").addEventListener("click", runMutation);
-  $("#refresh-overview").addEventListener("click", async (event) => {
+  $("#select-all-scenarios")?.addEventListener("click", () => {
+    state.selectedAttacks = new Set(state.attacks.map((attack) => attack.id));
+    renderScenarioPicker();
+  });
+  $("#clear-scenarios")?.addEventListener("click", () => {
+    state.selectedAttacks.clear();
+    renderScenarioPicker();
+  });
+  $("#load-demo-scenario")?.addEventListener("click", () => {
+    state.selectedAttacks = new Set(["atk-001", "atk-009", "atk-016", "atk-023"]);
+    state.intensity = 1.28;
+    $("#volume-slider").value = "120";
+    $("#volume-output").textContent = "120 events";
+    $$("#intensity-picker button").forEach((item) => {
+      const active = item.dataset.intensity === "1.28";
+      item.classList.toggle("active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
+    renderScenarioPicker();
+    toast("Judge demo loaded: deepfake, OTP relay, recovery, and voice replay.");
+  });
+  $("#run-simulation")?.addEventListener("click", runSimulation);
+  $("#retrain-button")?.addEventListener("click", retrainModel);
+  $("#refresh-fidelity")?.addEventListener("click", loadFidelity);
+  $("#export-report")?.addEventListener("click", exportReport);
+  $("#run-mutation")?.addEventListener("click", runMutation);
+  $("#refresh-overview")?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
     try {

@@ -355,6 +355,30 @@ class AppHandler(BaseHTTPRequestHandler):
         except Exception:  # pragma: no cover - top-level guard for prototype resilience
             self._json({"error": "Internal server error", "request_id": self.request_id}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
+    def do_HEAD(self) -> None:  # noqa: N802
+        """Serve GET headers without a body for health checks and deployment probes."""
+        parsed = urlparse(self.path)
+        self.request_id = self.headers.get("X-Request-ID") or str(uuid.uuid4())
+        self.request_started = time.perf_counter()
+        try:
+            status, headers, _body = _dispatch_wsgi({
+                "REQUEST_METHOD": "GET",
+                "PATH_INFO": parsed.path,
+                "QUERY_STRING": parsed.query,
+                "HTTP_X_REQUEST_ID": self.request_id,
+                "CONTENT_LENGTH": "0",
+                "wsgi.input": BytesIO(),
+            })
+            self.send_response(status)
+            for key, value in headers:
+                self.send_header(key, value)
+            self.end_headers()
+            _structured_log("http_request", method="HEAD", path=_normalize_path(parsed.path), request_id=self.request_id, status=status, duration_ms=round((time.perf_counter() - self.request_started) * 1000, 3))
+        except Exception:  # pragma: no cover - probe resilience
+            self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = _normalize_path(parsed.path)

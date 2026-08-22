@@ -123,6 +123,7 @@ class NewCapabilityTests(unittest.TestCase):
             sqlite_store = EventStore(handle.name)
             sqlite_store.append("models", {"cycle": 2})
             self.assertEqual(2, sqlite_store.list("models")[0]["payload"]["cycle"])
+            sqlite_store.close()
 
     def test_feedback_and_mutation_targets_are_retrainable_and_explicit(self) -> None:
         engine = DefenseEngine(seed=2030)
@@ -249,6 +250,8 @@ class WebArtifactTests(unittest.TestCase):
             self.assertIn(view, html)
         self.assertIn("independent challenge prototype", html.lower())
         self.assertIn("run-mutation", html)
+        self.assertIn("load-demo-scenario", html)
+        self.assertIn("select-all-scenarios", html)
         self.assertIn("/favicon.svg", html)
         self.assertNotIn("/_vercel/insights/script.js", html)
 
@@ -288,6 +291,11 @@ class WebArtifactTests(unittest.TestCase):
         self.assertIn("rollback", health["capabilities"])
         self.assertIn("audit", health["capabilities"])
         self.assertTrue(health["api_version"])
+
+        status, headers, body = request("/api/health", "HEAD")
+        self.assertEqual("200 OK", status)
+        self.assertEqual(b"", body)
+        self.assertEqual("application/json; charset=utf-8", headers["Content-Type"])
 
         status, headers, body = request("/favicon.ico")
         self.assertEqual("200 OK", status)

@@ -236,6 +236,13 @@ tbody tr:hover { background: #fbfaf8; }
 .sim-builder { padding-bottom: 20px; }
 .field-block { padding: 20px 20px 0; }
 .field-block label { display: flex; justify-content: space-between; margin-bottom: 11px; color: #74746f; font: 500 8px/1 "DM Mono", monospace; }
+.field-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 11px; }
+.field-label-row label { margin-bottom: 0; }
+.scenario-tools, .builder-head-actions { display: flex; align-items: center; gap: 7px; }
+.scenario-tools .icon-button { width: 27px; height: 27px; }
+.scenario-tools .icon-button svg { width: 13px; height: 13px; }
+.selection-summary { color: var(--red); font: 700 8px/1 "DM Mono", monospace; }
+.builder-head-actions .text-button { padding: 5px 0; font-size: 9px; }
 .field-block output { color: var(--ink); }
 .scenario-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; max-height: 250px; overflow-y: auto; padding-right: 3px; }
 .scenario-option { min-height: 50px; display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid #dfddd8; border-radius: 4px; cursor: pointer; background: #fff; }

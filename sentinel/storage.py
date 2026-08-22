@@ -19,6 +19,26 @@ class EventStore:
             self.connection.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)")
             self.connection.commit()
 
+    def close(self) -> None:
+        """Close an optional SQLite connection without affecting memory stores."""
+        with self.lock:
+            if self.connection is not None:
+                self.connection.close()
+                self.connection = None
+
+    def __enter__(self) -> "EventStore":
+        return self
+
+    def __exit__(self, _exc_type, _exc_value, _traceback) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        # Best-effort cleanup for short-lived CLI/test instances.
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def append(self, kind: str, payload: dict) -> dict:
         item = {"kind": kind, "payload": payload, "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
         with self.lock:
