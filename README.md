@@ -43,18 +43,18 @@ flowchart LR
 
 ```text
 ┌──────────────────┬─────────────────────────────────────────────────────────┐
-│ MASTERSHIELD     │  LIVE API     MODEL hybrid-logit-c02     0 queued        │
+│ MASTERSHIELD     │  LIVE API     MODEL hybrid-logit-c02     0 queued       │
 │                  ├─────────────────────────────────────────────────────────┤
-│  Overview        │  F1 SCORE   ROC AUC   FPR       ATTACK COVERAGE          │
-│  Attack intel    │  ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐       │
-│  Simulation lab  │  │ 0.998  │ │ 1.000  │ │ 0.1%   │ │ 17 / 24      │       │
-│  Defense model   │  └────────┘ └────────┘ └────────┘ └──────────────┘       │
+│  Overview        │  F1 SCORE   ROC AUC   FPR       ATTACK COVERAGE         │
+│  Attack intel    │  ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐      │
+│  Simulation lab  │  │ 0.998  │ │ 1.000  │ │ 0.1%   │ │ 17 / 24      │      │
+│  Defense model   │  └────────┘ └────────┘ └────────┘ └──────────────┘      │
 │  Validation      │                                                         │
 │  Fidelity        │  Red team → Generate → Defend → Learn                   │
-│                  │  ┌────────────────────┐ ┌───────────────────────────┐  │
-│  LOOP ACTIVE     │  │ risk distribution   │ │ recent payment decisions │  │
-│  Cycle 02        │  │ legitimate / attack│ │ rail • amount • risk      │  │
-│                  │  └────────────────────┘ └───────────────────────────┘  │
+│                  │  ┌────────────────────┐ ┌───────────────────────────┐   │
+│  LOOP ACTIVE     │  │ risk distribution   │ │ recent payment decisions │   │
+│  Cycle 02        │  │ legitimate / attack│ │ rail • amount • risk      │   │
+│                  │  └────────────────────┘ └───────────────────────────┘   │
 └──────────────────┴─────────────────────────────────────────────────────────┘
 ```
 
