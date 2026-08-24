@@ -229,6 +229,7 @@ function requireCapability(capability) {
 }
 
 function switchView(viewName) {
+  document.body.dataset.view = viewName;
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${viewName}`));
   $$(".nav-item").forEach((item) => {
     const active = item.dataset.view === viewName;
@@ -240,9 +241,42 @@ function switchView(viewName) {
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (viewName === "attacks") renderAttackTable();
   if (viewName === "simulate") renderScenarioPicker();
-  if (viewName === "defense") renderDefense();
-  if (viewName === "overview" && state.overview) requestAnimationFrame(() => drawBoundaryChart(state.overview));
+  if (viewName === "defense") { renderDefense(); activatePipeline("#risk-engine-pipeline"); }
+  if (viewName === "overview" && state.overview) requestAnimationFrame(() => { drawBoundaryChart(state.overview); drawEvaluationCurves(state.overview); });
+  if (viewName === "evidence" && state.overview) requestAnimationFrame(() => drawEvaluationCurves(state.overview));
   if (viewName === "fidelity" && !state.fidelity) loadFidelity();
+}
+
+function openCommandPalette() {
+  const palette = $("#command-palette");
+  if (!palette) return;
+  palette.showModal();
+  requestAnimationFrame(() => $("#command-search")?.focus());
+}
+
+function bindCommandPalette() {
+  $("#command-trigger")?.addEventListener("click", openCommandPalette);
+  $("#command-search")?.addEventListener("input", (event) => {
+    const query = event.target.value.trim().toLowerCase();
+    $$("[data-command-view]", $("#command-list")).forEach((item) => {
+      item.hidden = query && !item.textContent.toLowerCase().includes(query);
+    });
+  });
+  $$('[data-command-view]').forEach((button) => button.addEventListener("click", () => {
+    $("#command-palette")?.close();
+    switchView(button.dataset.commandView);
+  }));
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      openCommandPalette();
+    }
+    if ((event.metaKey || event.ctrlKey) && /^[1-6]$/.test(event.key)) {
+      event.preventDefault();
+      const view = ["overview", "attacks", "simulate", "defense", "evidence", "fidelity"][Number(event.key) - 1];
+      switchView(view);
+    }
+  });
 }
 
 function decisionHTML(decision) {
@@ -255,8 +289,9 @@ function renderTransactions(rows) {
   if (!body) return;
   rows = Array.isArray(rows) ? rows : [];
   rows.forEach((row) => state.transactionIndex.set(row.id, row));
-  body.innerHTML = rows.slice(0, 8).map((row) => `
-    <tr>
+  const prioritized = [...rows].sort((a, b) => Number(b.risk_score || 0) - Number(a.risk_score || 0));
+  body.innerHTML = prioritized.slice(0, 8).map((row) => `
+    <tr class="event-row severity-${escapeHTML(row.risk_level || "low")}" data-transaction-row="${escapeHTML(row.id)}">
       <td><span class="tx-main">${escapeHTML(row.id)}</span><span class="tx-sub">${escapeHTML(row.attack_name || "legitimate baseline")}</span></td>
       <td><span class="tx-main">${escapeHTML(row.rail)}</span><span class="tx-sub">${escapeHTML(row.channel)}</span></td>
       <td><span class="tx-main">${money(row.amount, row.currency)}</span><span class="tx-sub">${escapeHTML(row.country)}</span></td>
@@ -266,6 +301,7 @@ function renderTransactions(rows) {
     </tr>
   `).join("");
   $$('[data-transaction-detail]', body).forEach((button) => button.addEventListener("click", () => openTransactionDialog(button.dataset.transactionDetail)));
+  $$('[data-transaction-row]', body).forEach((row) => row.addEventListener("dblclick", () => openTransactionDialog(row.dataset.transactionRow)));
   refreshIcons();
 }
 
@@ -277,6 +313,156 @@ function renderAttackMix(items) {
   target.innerHTML = items.length ? items.map((item) => `
     <div class="mix-row"><span title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span><div class="mix-bar"><i style="width:${Math.max(6, item.count / max * 100)}%"></i></div><b>${item.count}</b></div>
   `).join("") : `<div class="empty-state" style="min-height:200px"><strong>No active attacks</strong></div>`;
+}
+
+function renderThreatLandscape(items) {
+  const target = $("#threat-landscape");
+  if (!target) return;
+  const rows = Array.isArray(items) ? items.slice(0, 7) : [];
+  const max = Math.max(1, ...rows.map((item) => Number(item.count || 0)));
+  target.innerHTML = rows.length ? rows.map((item, index) => `
+    <button class="landscape-row" data-landscape-name="${escapeHTML(item.name)}" type="button" aria-label="Filter by ${escapeHTML(item.name)}">
+      <span class="landscape-rank">0${index + 1}</span><span class="landscape-name">${escapeHTML(item.name)}</span><span class="landscape-bar"><i style="width:${Math.max(8, Number(item.count || 0) / max * 100)}%"></i></span><b>${item.count}</b>
+    </button>`).join("") : `<div class="landscape-empty">No active threats in the current stream.</div>`;
+  $$('[data-landscape-name]', target).forEach((button) => button.addEventListener("click", () => {
+    const matching = state.attacks.find((item) => item.name === button.dataset.landscapeName);
+    if (matching) {
+      state.selectedAttacks = new Set([matching.id]);
+      switchView("simulate");
+      toast(`Focused simulation on ${matching.name}.`);
+    }
+  }));
+}
+
+function renderAttackBubbles(items) {
+  const target = $("#attack-bubble-field");
+  if (!target) return;
+  const rows = Array.isArray(items) ? items.slice(0, 16) : [];
+  const max = Math.max(1, ...rows.map((item) => Number(item.samples || 0)));
+  target.innerHTML = rows.length ? rows.map((item, index) => {
+    const size = 54 + (Number(item.samples || 0) / max) * 48;
+    return `<button class="attack-bubble severity-${escapeHTML(item.severity || "Medium")}" style="--bubble-size:${size}px;--bubble-x:${12 + ((index * 29) % 78)}%;--bubble-y:${24 + ((index * 41) % 54)}%" data-bubble-attack="${escapeHTML(item.attack_id)}" type="button" title="Focus ${escapeHTML(item.name)}"><span>${escapeHTML(item.name)}</span><small>${item.samples || 0} events</small></button>`;
+  }).join("") : `<div class="network-empty">No attack samples in the current stream.</div>`;
+  $$('[data-bubble-attack]', target).forEach((button) => button.addEventListener("click", () => {
+    const attack = state.attacks.find((item) => item.id === button.dataset.bubbleAttack);
+    if (!attack) return;
+    $("#attack-search").value = attack.name;
+    renderAttackTable();
+    toast(`Threat intelligence focused on ${attack.name}.`);
+  }));
+}
+
+function renderThreatNetwork(rows) {
+  const target = $("#threat-network");
+  if (!target) return;
+  const candidates = (Array.isArray(rows) ? rows : []).filter((row) => Number(row.risk_score || 0) >= 0.7).slice(0, 3);
+  const row = candidates[0] || (Array.isArray(rows) ? rows[0] : null);
+  if (!row) {
+    target.innerHTML = `<div class="network-empty">Waiting for synthetic events…</div>`;
+    return;
+  }
+  const entities = [
+    { key: "customer", label: "CUSTOMER", value: row.customer_id || "c-unknown", x: 14, y: 50, tone: "entity" },
+    { key: "transaction", label: "TRANSACTION", value: row.id || "tx-unknown", x: 36, y: 50, tone: "signal", tx: true },
+    { key: "merchant", label: "MERCHANT", value: row.merchant_id || "m-unknown", x: 59, y: 27, tone: "entity" },
+    { key: "device", label: "DEVICE", value: row.device_id || "d-unknown", x: 59, y: 73, tone: "entity" },
+    { key: "ip", label: "NETWORK", value: row.country ? `${row.country} / IP` : "ip reputation", x: 82, y: 26, tone: "signal" },
+    { key: "location", label: "LOCATION", value: row.country || "unknown", x: 82, y: 74, tone: "entity" },
+    { key: "risk", label: "RISK EVENT", value: `${Math.round(Number(row.risk_score || 0) * 100)} / ${String(row.decision || "review").toUpperCase()}`, x: 91, y: 50, tone: "critical" },
+  ];
+  const edges = [[0,1],[1,2],[1,3],[2,4],[3,5],[4,6],[5,6]];
+  const svg = `<svg class="network-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="network-gradient" x1="0" x2="1"><stop stop-color="#f04438"/><stop offset=".5" stop-color="#f59e0b"/><stop offset="1" stop-color="#22d3ee"/></linearGradient><filter id="network-glow"><feGaussianBlur stdDeviation=".8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${edges.map(([from, to]) => `<line class="network-edge" x1="${entities[from].x}" y1="${entities[from].y}" x2="${entities[to].x}" y2="${entities[to].y}" />`).join("")}</svg>`;
+  target.innerHTML = `${svg}<div class="network-grid-lines"></div>${entities.map((item) => `<button class="network-node ${item.tone} ${item.tx ? "transaction-node" : ""}" style="left:${item.x}%;top:${item.y}%" data-network-node="${escapeHTML(item.key)}" ${item.tx ? `data-network-transaction="${escapeHTML(row.id)}"` : ""}><span class="node-orbit"></span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(item.value)}</small></button>`).join("")}<div class="network-caption"><span class="status-dot"></span> Trace selected high-risk event / ${escapeHTML(row.id)}</div>`;
+  $$('[data-network-node]', target).forEach((button) => button.addEventListener("click", () => {
+    if (button.dataset.networkTransaction) openTransactionDialog(button.dataset.networkTransaction);
+    else toast(`${button.querySelector("strong")?.textContent || "Entity"}: ${button.querySelector("small")?.textContent || "synthetic entity"}`);
+  }));
+}
+
+function renderRobustnessHeatmap(data) {
+  const target = $("#robustness-heatmap");
+  if (!target) return;
+  const robust = data?.robustness || {};
+  const grid = robust.robustness_grid || {};
+  const fallbackSeries = (value) => [value || 0, value || 0, value || 0, value || 0];
+  const rows = [
+    ["KNOWN ATTACK", ...(grid.known_attack || fallbackSeries(robust.known_low_intensity?.attack_recall)).map((item) => item.attack_recall ?? item)],
+    ["UNKNOWN ATTACK", ...(grid.unknown_attack || fallbackSeries(robust.unseen_attack_families?.attack_recall)).map((item) => item.attack_recall ?? item)],
+    ["MISSING FEATURES", ...(grid.missing_features || fallbackSeries(robust.missing_features?.attack_recall)).map((item) => item.attack_recall ?? item)],
+    ["BEHAVIOR DRIFT", ...(grid.behavior_drift || fallbackSeries(robust.unseen_attack_families?.attack_recall)).map((item) => item.attack_recall ?? item)],
+    ["NOISE", ...(grid.noise || fallbackSeries(robust.legitimate_baseline?.attack_recall)).map((item) => item.attack_recall ?? item)],
+  ].map(([label, ...values]) => [label, ...[0, 1, 2, 3].map((index) => values[index] ?? values.at(-1) ?? 0)]);
+  const levels = ["LOW", "MEDIUM", "HIGH", "EXTREME"];
+  target.innerHTML = `<div class="heatmap-corner">DETECTION RECALL</div>${levels.map((level) => `<div class="heatmap-heading">${level}</div>`).join("")}${rows.map(([label, ...values]) => `<div class="heatmap-row-label">${label}</div>${values.map((value, index) => { const bounded = boundedRatio(value); const heatClass = bounded >= .85 ? "heat-high" : bounded >= .65 ? "heat-mid" : "heat-low"; return `<button class="heatmap-cell ${heatClass}" data-heat-label="${escapeHTML(label)}" data-heat-level="${levels[index]}" data-heat-value="${Number(value || 0)}" type="button"><strong>${pct(value, 0)}</strong><small>${index === 0 ? "observed" : index === 1 ? "stress" : index === 2 ? "high stress" : "edge case"}</small></button>`; }).join("")}`).join("")}`;
+  $$('[data-heat-label]', target).forEach((cell) => cell.addEventListener("click", () => {
+    const value = Number(cell.dataset.heatValue || 0);
+    $("#heatmap-detail").innerHTML = `<strong>${escapeHTML(cell.dataset.heatLabel)} / ${escapeHTML(cell.dataset.heatLevel)}</strong><span>Detection recall <b>${pct(value, 1)}</b> · synthetic evidence · confidence band is represented by the measured scenario output.</span>`;
+    $$('[data-heat-label]', target).forEach((other) => other.classList.toggle("selected", other === cell));
+  }));
+}
+
+function activatePipeline(selector) {
+  const stages = $$(`${selector} > div, ${selector} > .pipeline-stage`);
+  stages.forEach((stage, index) => {
+    if (stage.classList.contains("pipeline-link") || stage.tagName === "B") return;
+    stage.classList.remove("active", "complete");
+    setTimeout(() => stage.classList.add("active"), index * 230);
+    setTimeout(() => { stage.classList.remove("active"); stage.classList.add("complete"); }, index * 230 + 750);
+  });
+}
+
+function animateSimulationStory(result) {
+  activatePipeline("#simulation-pipeline");
+  const status = $("#simulation-story-status");
+  if (status) {
+    status.innerHTML = `<span class="status-dot"></span> ANALYZED / ${pct(result.detection_rate, 0)} DETECTED`;
+    status.classList.add("story-complete");
+  }
+  const sample = Array.isArray(result.sample) ? result.sample[0] : null;
+  const risk = sample ? Math.round(Number(sample.risk_score || result.mean_risk || 0) * 100) : Math.round(Number(result.mean_risk || 0) * 100);
+  const control = result.control_sample || null;
+  const comparison = $("#simulation-comparison");
+  if (comparison) comparison.dataset.risk = String(risk);
+  const controlsRisk = control ? Math.round(Number(control.risk_score || 0) * 100) : 0;
+  $("#simulation-comparison")?.querySelector("div:first-child strong") && ($("#simulation-comparison").querySelector("div:first-child strong").textContent = controlsRisk);
+  $("#simulation-comparison")?.querySelector(".critical-comparison strong") && ($("#simulation-comparison").querySelector(".critical-comparison strong").textContent = risk);
+  $("#simulation-comparison")?.querySelector("div:first-child small") && ($("#simulation-comparison").querySelector("div:first-child small").textContent = control ? "measured legitimate control" : "control unavailable");
+  $("#simulation-comparison")?.querySelector(".critical-comparison small") && ($("#simulation-comparison").querySelector(".critical-comparison small").textContent = `${pct(result.detection_rate, 0)} detected / action required`);
+  const factors = $("#simulation-comparison")?.querySelector(".comparison-factors");
+  if (factors && sample && control) factors.innerHTML = `
+    <span>1-hour velocity <b>${Number(control.velocity_1h || 0).toFixed(0)} → ${Number(sample.velocity_1h || 0).toFixed(0)}</b></span>
+    <span>network risk <b>${pct(control.ip_risk || 0, 0)} → ${pct(sample.ip_risk || 0, 0)}</b></span>
+    <span>behavior consistency <b>${pct(control.typing_consistency || 0, 0)} → ${pct(sample.typing_consistency || 0, 0)}</b></span>`;
+}
+
+function bindInteractiveAmbient() {
+  const root = document.documentElement;
+  let frame = 0;
+  let pointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.35 };
+  const commit = () => {
+    frame = 0;
+    root.style.setProperty("--cursor-x", `${pointer.x}px`);
+    root.style.setProperty("--cursor-y", `${pointer.y}px`);
+  };
+  document.addEventListener("pointermove", (event) => {
+    pointer = { x: event.clientX, y: event.clientY };
+    if (!frame) frame = requestAnimationFrame(commit);
+  }, { passive: true });
+  $$(".surface, .network-panel, .signal-panel, .simulation-story-panel, .risk-engine-panel, .fidelity-hero-panel, .attack-landscape-panel").forEach((surface) => {
+    surface.addEventListener("pointermove", (event) => {
+      const rect = surface.getBoundingClientRect();
+      surface.style.setProperty("--card-x", `${((event.clientX - rect.left) / rect.width) * 100}%`);
+      surface.style.setProperty("--card-y", `${((event.clientY - rect.top) / rect.height) * 100}%`);
+      surface.style.setProperty("--card-tilt-x", `${((event.clientY - rect.top) / rect.height - .5) * -1.2}deg`);
+      surface.style.setProperty("--card-tilt-y", `${((event.clientX - rect.left) / rect.width - .5) * 1.2}deg`);
+    }, { passive: true });
+    surface.addEventListener("pointerleave", () => {
+      surface.style.removeProperty("--card-x");
+      surface.style.removeProperty("--card-y");
+      surface.style.removeProperty("--card-tilt-x");
+      surface.style.removeProperty("--card-tilt-y");
+    });
+  });
 }
 
 function drawBoundaryChart(data) {
@@ -338,6 +524,55 @@ function drawBoundaryChart(data) {
   ctx.fillText(`THRESHOLD ${threshold.toFixed(2)}`, Math.min(width - 96, thresholdX + 5), pad.top + 11);
 }
 
+function drawEvaluationCurves(data) {
+  const canvas = $("#evaluation-curves");
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const ratio = Math.max(1, window.devicePixelRatio || 1);
+  const width = Math.max(420, Math.floor((rect.width || 900) * ratio));
+  const height = Math.floor(250 * ratio);
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const w = width / ratio;
+  const h = height / ratio;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#07111f";
+  ctx.fillRect(0, 0, w, h);
+  const pad = { left: 42, right: 28, top: 23, bottom: 32 };
+  const graphW = (w - pad.left - pad.right) / 2 - 22;
+  const graphH = h - pad.top - pad.bottom;
+  const dist = data?.validation?.risk_distribution || {};
+  const legitimate = Array.isArray(dist.legitimate) ? dist.legitimate : [];
+  const attacks = Array.isArray(dist.attack) ? dist.attack : [];
+  const totalNormal = Math.max(1, legitimate.reduce((sum, value) => sum + value, 0));
+  const totalAttack = Math.max(1, attacks.reduce((sum, value) => sum + value, 0));
+  const points = Math.max(legitimate.length, attacks.length, 2);
+  const cumulativeFromHigh = (values, total) => {
+    let running = 0;
+    return values.map((_, index) => { running += values[values.length - index - 1] || 0; return running / total; });
+  };
+  const fpr = cumulativeFromHigh(legitimate, totalNormal);
+  const tpr = cumulativeFromHigh(attacks, totalAttack);
+  const rocPoints = [[0, 0], ...Array.from({ length: points }, (_, index) => [fpr[index] ?? 1, tpr[index] ?? 1]), [1, 1]];
+  const precisionRecall = [[0, 1], ...Array.from({ length: points }, (_, index) => {
+    const tp = (attacks[attacks.length - index - 1] || 0) + (index ? tpr[index - 1] * totalAttack : 0);
+    const fp = (legitimate[legitimate.length - index - 1] || 0) + (index ? fpr[index - 1] * totalNormal : 0);
+    return [Math.min(1, tp / Math.max(1, tp + fp)), tpr[index] ?? 0];
+  })];
+  const drawGraph = (originX, title, xLabel, yLabel, curve, color) => {
+    ctx.strokeStyle = "rgba(139,176,204,.18)"; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i += 1) { const y = pad.top + graphH * i / 4; ctx.beginPath(); ctx.moveTo(originX, y); ctx.lineTo(originX + graphW, y); ctx.stroke(); const x = originX + graphW * i / 4; ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + graphH); ctx.stroke(); }
+    ctx.fillStyle = "#a7c4d8"; ctx.font = "600 9px ui-monospace, monospace"; ctx.fillText(title, originX, 14); ctx.fillStyle = "#6f91aa"; ctx.font = "500 8px ui-monospace, monospace"; ctx.fillText(xLabel, originX + graphW - 58, h - 8); ctx.save(); ctx.translate(originX - 28, pad.top + graphH / 2 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, 0, 0); ctx.restore();
+    ctx.save(); ctx.beginPath(); curve.forEach(([x, y], index) => { const px = originX + x * graphW; const py = pad.top + (1 - y) * graphH; index ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
+  };
+  drawGraph(pad.left, "ROC CURVE", "false positive rate", "true positive rate", rocPoints, "#22d3ee");
+  drawGraph(pad.left + graphW + 44, "PRECISION / RECALL", "recall", "precision", precisionRecall.map(([precision, recall]) => [recall, precision]), "#f59e0b");
+  $("#evaluation-auc") && ($("#evaluation-auc").textContent = Number(data?.metrics?.auc || 0).toFixed(3));
+  $("#evaluation-pr-auc") && ($("#evaluation-pr-auc").textContent = Number(data?.metrics?.pr_auc || 0).toFixed(3));
+}
+
 function renderOverview() {
   const data = state.overview;
   if (!data) return;
@@ -347,10 +582,14 @@ function renderOverview() {
   const latest = history.at(-1) || { f1: metrics.f1 || 0, attack_coverage: data.detected_attack_coverage || 0 };
   const previous = history.at(-2) || latest;
   const f1Delta = latest.f1 - previous.f1;
-  $("#kpi-f1").textContent = pct(metrics.f1);
-  $("#kpi-f1-delta").textContent = `${f1Delta >= 0 ? "+" : ""}${pct(f1Delta)} after frontier feedback`;
-  $("#kpi-auc").textContent = Number(metrics.auc || 0).toFixed(3);
-  $("#kpi-fpr").textContent = pct(metrics.false_positive_rate);
+  const recentRows = Array.isArray(data.recent_transactions) ? data.recent_transactions : [];
+  const highRisk = recentRows.filter((row) => Number(row.risk_score || 0) >= 0.7).length;
+  const contained = recentRows.filter((row) => ["decline", "review"].includes(row.decision)).length;
+  const securityScore = Math.round(Math.max(0, Math.min(100, (Number(metrics.recall || 0) * 45) + (Number(metrics.specificity || 0) * 35) + ((1 - Number(metrics.false_positive_rate || 0)) * 20))));
+  $("#kpi-f1").textContent = securityScore;
+  $("#kpi-f1-delta").textContent = `${f1Delta >= 0 ? "+" : ""}${pct(f1Delta)} model stability`;
+  $("#kpi-auc").textContent = compactNumber(data.stream_size || recentRows.length);
+  $("#kpi-fpr").textContent = highRisk;
   $("#kpi-coverage").textContent = latest.attack_coverage;
   $("#kpi-catalog-size").textContent = data.catalog_size;
   $("#intro-model").textContent = system.model_version || "model unavailable";
@@ -370,12 +609,18 @@ function renderOverview() {
   $("#latency-p95").textContent = `${Number(system.latency_ms_p95 || 0).toFixed(2)} ms`;
   renderTransactions(data.recent_transactions || []);
   renderAttackMix(data.attack_mix || []);
+  renderThreatLandscape(data.attack_mix || []);
+  renderThreatNetwork(data.recent_transactions || []);
   const activeCoverage = Number(data.detected_attack_coverage || 0);
   const catalogSize = Math.max(1, Number(data.catalog_size || 0));
   $("#coverage-ring").style.setProperty("--coverage", `${boundedRatio(activeCoverage / catalogSize) * 100}%`);
   $("#coverage-ring-value").textContent = `${activeCoverage}/${data.catalog_size}`;
   $("#coverage-title").textContent = activeCoverage === data.catalog_size ? "Full stream coverage" : "Current stream coverage";
   drawBoundaryChart(data);
+  drawEvaluationCurves(data);
+  $("#security-score") && ($("#security-score").textContent = securityScore);
+  $("#risk-gauge")?.style.setProperty("--score", `${securityScore * 3.6}deg`);
+  $("#system-feedback-status") && ($("#system-feedback-status").textContent = state.feedbackQueued ? `${state.feedbackQueued} QUEUED` : "ARMED");
   renderDefense();
 }
 
@@ -388,6 +633,7 @@ function renderAttackTable() {
   });
   $("#attack-count").textContent = rows.length;
   $("#attack-count-meta").textContent = `${state.attacks.length} total scenarios in catalog`;
+  renderAttackBubbles(state.attacks);
   $("#attack-table-body").innerHTML = rows.length ? rows.map((attack) => {
     const detection = attack.detection_rate == null ? 0 : boundedRatio(attack.detection_rate);
     return `
@@ -462,10 +708,12 @@ function renderSimulationResult(result) {
   $("#simulation-queue").textContent = result.feedback_ready;
   $("#side-feedback").textContent = `${result.feedback_ready} queued`;
   $("#loop-queue").textContent = `${result.feedback_ready} rows`;
+  animateSimulationStory(result);
 }
 
 function renderFidelity(data) {
   state.fidelity = data;
+  renderRobustnessHeatmap(data);
   $("#fidelity-distance").textContent = Number(data.mean_feature_distance || 0).toFixed(3);
   $("#fidelity-scenario-distance").textContent = Number(data.scenario_mix_distance || 0).toFixed(3);
   $("#fidelity-unseen-recall").textContent = pct(data.robustness?.unseen_attack_families?.attack_recall || 0);
@@ -493,14 +741,19 @@ function renderMutation(data) {
 function openTransactionDialog(transactionId) {
   const row = state.transactionIndex.get(transactionId);
   if (!row) return;
-  $("#transaction-dialog-title").textContent = `${row.id} / ${String(row.decision || "review").toUpperCase()}`;
+  const riskScore = Math.round(boundedRatio(row.risk_score) * 100);
+  const riskLabel = riskScore >= 80 ? "CRITICAL" : riskScore >= 60 ? "HIGH" : riskScore >= 35 ? "ELEVATED" : "LOW";
+  const recommendedAction = row.decision === "approve" ? "Approve and continue monitoring." : row.decision === "decline" ? "Contain the event and retain model reasons for review." : "Require additional verification before authorization.";
+  $("#transaction-dialog-title").textContent = `${row.id} / INVESTIGATION`;
   const explanations = row.explanations || [];
   $("#transaction-dialog-content").innerHTML = `
-    <div class="detail-metrics"><div><span>RISK SCORE</span><strong>${pct(row.risk_score, 0)}</strong></div><div><span>AMOUNT</span><strong>${money(row.amount, row.currency)}</strong></div><div><span>CONTEXT</span><strong>${escapeHTML(row.rail)} / ${escapeHTML(row.channel)}</strong></div></div>
-    <section class="detail-section"><span>PAYMENT CONTEXT</span><p>${escapeHTML(row.attack_name || "Legitimate payment baseline")} / ${escapeHTML(row.country || "unknown country")}</p></section>
-    <section class="detail-section"><span>REASON CODES</span>${explanations.length ? `<div class="reason-list">${explanations.map((item) => `<div class="reason-row"><span>${escapeHTML(item.label)}</span><div class="reason-bar"><i style="width:${Math.min(100, Math.max(8, Number(item.contribution || 0) * 32))}%"></i></div><b>${Number(item.contribution || 0).toFixed(2)}</b></div>`).join("")}</div>` : "<p>No elevated model contribution crossed the explanation floor.</p>"}</section>
-    <section class="detail-section"><span>RECOMMENDED ACTION</span><p>${row.decision === "approve" ? "Approve and continue monitoring." : row.decision === "decline" ? "Decline and retain the model reasons for review." : "Step up or route to analyst review before authorization."}</p></section>
-    <section class="detail-section"><span>ANALYST OUTCOME</span><div class="segmented feedback-actions"><button data-feedback-outcome="confirmed_fraud" type="button">CONFIRMED FRAUD</button><button data-feedback-outcome="confirmed_legitimate" type="button">LEGITIMATE</button><button data-feedback-outcome="uncertain" type="button">UNCERTAIN</button></div></section>`;
+    <div class="investigation-hero"><div class="investigation-score" style="--risk:${riskScore * 3.6}deg"><strong>${riskScore}</strong><span>${riskLabel} RISK</span></div><div><span class="investigation-status">${escapeHTML(String(row.decision || "review").toUpperCase())}</span><h3>${escapeHTML(row.attack_name || "Payment behavior review")}</h3><p>${escapeHTML(row.rail)} / ${escapeHTML(row.channel)} / ${escapeHTML(row.country || "unknown")}</p></div></div>
+    <div class="detail-metrics"><div><span>AMOUNT</span><strong>${money(row.amount, row.currency)}</strong></div><div><span>CUSTOMER</span><strong class="mono">${escapeHTML(row.customer_id || "—")}</strong></div><div><span>DEVICE</span><strong class="mono">${escapeHTML(row.device_id || "—")}</strong></div></div>
+    <section class="detail-section"><span>WHY WAS THIS FLAGGED?</span>${explanations.length ? `<div class="reason-list">${explanations.map((item) => `<div class="reason-row"><span>${escapeHTML(item.label)}</span><div class="reason-bar"><i style="width:${Math.max(10, boundedRatio(item.contribution_share || item.contribution) * 100)}%"></i></div><b>${pct(item.contribution_share || 0, 0)}</b></div>`).join("")}</div>` : "<p>No elevated model contribution crossed the explanation floor.</p>"}</section>
+    <section class="detail-section ai-explanation"><span>AI EXPLANATION</span><p>This event deviates from its synthetic baseline across ${Math.max(1, explanations.length)} measured dimensions. The strongest factor is ${escapeHTML(explanations[0]?.label || "transaction context")}; the model has surfaced each contribution for analyst review.</p></section>
+    <section class="detail-section"><span>ENTITY RELATIONSHIP</span><div class="entity-chain"><span><i data-lucide="user-round"></i>${escapeHTML(row.customer_id || "Customer")}</span><i data-lucide="arrow-right"></i><span><i data-lucide="smartphone"></i>${escapeHTML(row.device_id || "Device")}</span><i data-lucide="arrow-right"></i><span><i data-lucide="store"></i>${escapeHTML(row.merchant_id || "Merchant")}</span><i data-lucide="arrow-right"></i><span class="entity-risk"><i data-lucide="shield-alert"></i>${riskLabel}</span></div></section>
+    <section class="detail-section recommendation"><span>RECOMMENDED ACTION</span><div><i data-lucide="badge-check"></i><p>${recommendedAction}</p></div></section>
+    <section class="detail-section"><span>ACTION CENTER</span><div class="action-center"><button class="secondary-action" data-feedback-outcome="confirmed_legitimate" data-override-decision="approve" type="button"><i data-lucide="check"></i> Approve</button><button class="secondary-action" data-feedback-outcome="uncertain" data-override-decision="step_up" type="button"><i data-lucide="fingerprint"></i> Verify</button><button class="danger-action" data-feedback-outcome="confirmed_fraud" data-override-decision="decline" type="button"><i data-lucide="ban"></i> Block</button></div></section>`;
   $("#transaction-dialog").showModal();
   $$('[data-feedback-outcome]', $("#transaction-dialog-content")).forEach((button) => {
     const feedbackAvailable = state.capabilities?.has("feedback");
@@ -509,8 +762,8 @@ function openTransactionDialog(transactionId) {
     button.addEventListener("click", async () => {
       if (!requireCapability("feedback")) return;
       try {
-        await requestJSON("/api/feedback", { method: "POST", body: JSON.stringify({ transaction_id: row.id, outcome: button.dataset.feedbackOutcome }) });
-        toast(`Analyst outcome recorded for ${row.id}.`);
+        await requestJSON("/api/feedback", { method: "POST", body: JSON.stringify({ transaction_id: row.id, outcome: button.dataset.feedbackOutcome, override_decision: button.dataset.overrideDecision }) });
+        toast(`${button.dataset.overrideDecision === "decline" ? "BLOCKED — event contained" : button.dataset.overrideDecision === "approve" ? "APPROVED — outcome recorded" : "VERIFICATION REQUESTED"} for ${row.id}.`);
         button.parentElement.querySelectorAll("button").forEach((item) => item.disabled = true);
       } catch (error) {
         toast(`Feedback failed: ${error.message}`);
@@ -766,9 +1019,12 @@ function bindEvents() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.body.dataset.view = "overview";
   refreshIcons();
   bindRevealMotion();
   bindEvents();
+  bindCommandPalette();
+  bindInteractiveAmbient();
   loadData();
   setInterval(() => requestJSON("/api/health").then((health) => {
     const currentBackend = updateCapabilities(health);

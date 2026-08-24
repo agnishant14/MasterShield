@@ -8,3 +8,4 @@ __pycache__/
 work/*.json
 data/*.jsonl
 outputs/*.zip
+data/*.docs

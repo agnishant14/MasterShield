@@ -328,6 +328,7 @@ class DefenseEngine:
                 "feedback_ready": len(self.feedback_rows),
                 "feedback_buckets": self._feedback_bucket_counts(),
                 "sample": list(reversed(annotated_attacks[-12:])),
+                "control_sample": annotated_controls[-1] if annotated_controls else None,
             }
             self.simulation_history.append({key: result[key] for key in ("run_id", "generated", "controls", "detected", "missed", "false_positives", "detection_rate", "mean_risk", "feedback_ready")})
             self.store.append("simulations", result)
