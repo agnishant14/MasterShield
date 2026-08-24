@@ -52,7 +52,7 @@ flowchart LR
 │  Validation      │                                                         │
 │  Fidelity        │  Red team → Generate → Defend → Learn                   │
 │                  │  ┌────────────────────┐ ┌───────────────────────────┐   │
-│  LOOP ACTIVE     │  │ risk distribution   │ │ recent payment decisions │   │
+│  LOOP ACTIVE     │  │ risk distribution  │ │ recent payment decisions  │   │
 │  Cycle 02        │  │ legitimate / attack│ │ rail • amount • risk      │   │
 │                  │  └────────────────────┘ └───────────────────────────┘   │
 └──────────────────┴─────────────────────────────────────────────────────────┘
