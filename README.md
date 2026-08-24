@@ -4,7 +4,7 @@
 
 MasterShield is a closed-loop payment-security lab for discovering GenAI-enabled fraud, generating realistic synthetic attacks, and improving an explainable defense model through feedback.
 
-> Built for the Mastercard Innovation Challenge. All metrics and transactions in this prototype are synthetic evidence—not production claims.
+> Built for the Mastercard Innovation Challenge. All metrics and transactions in this prototype are synthetic evidence - not production claims.
 
 ## The core idea
 
