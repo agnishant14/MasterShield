@@ -555,7 +555,7 @@ input:focus-visible,
 .brand-sub,
 .tenant-stamp,
 .sidebar-footer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.brand-sub { color: #a9a9a6; font-size: 8px; letter-spacing: .08em; }
+.brand-sub { color: #a9a9a6; font-size: 9px; letter-spacing: .06em; }
 .tenant-stamp {
   margin: 16px 14px 8px;
   border-color: #313131;
@@ -1771,7 +1771,7 @@ tbody tr:hover { background: #fff9f5; }
   gap: 12px;
   padding: 0 4px 14px;
   color: var(--ms-muted);
-  font-size: 9px;
+  font-size: 10px;
 }
 .evaluation-controls label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 700; letter-spacing: .04em; }
 .evaluation-controls output { min-width: 30px; color: var(--ms-text); font-family: var(--code-font); font-size: 10px; }
@@ -1899,6 +1899,26 @@ h1, .page-intro h1, .page-title-row h1 {
 }
 .footer-brand span:not(.footer-circles) { font-size: 9px; line-height: 1.55; }
 .evidence-grid-single { grid-template-columns: 1fr; }
+.external-evidence-panel { margin-top: 18px; overflow: hidden; }
+.external-evidence-panel .surface-head { align-items: flex-start; }
+.external-evidence-panel .surface-head p { max-width: 700px; margin: 8px 0 0; color: var(--ms-text-2); font-size: 10px; line-height: 1.5; }
+.evidence-source-badge { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--ms-line); border-radius: 999px; color: var(--ms-muted); font: 700 8px/1 var(--code-font); letter-spacing: .04em; }
+.evidence-source-badge .status-dot { width: 6px; height: 6px; background: var(--ms-green); box-shadow: 0 0 0 3px rgba(15,138,95,.12); }
+.external-evidence-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--ms-line); }
+.external-evidence-row { display: grid; grid-template-columns: minmax(120px, .65fr) 1fr; gap: 16px; padding: 18px 20px; border-right: 1px solid var(--ms-line); border-bottom: 1px solid var(--ms-line); }
+.external-evidence-row:nth-child(2n) { border-right: 0; }
+.external-evidence-row:nth-last-child(-n+2) { border-bottom: 0; }
+.external-evidence-metric strong, .external-evidence-metric span { display: block; }
+.external-evidence-metric strong { color: var(--ms-text); font: 600 22px/1.05 var(--code-font); letter-spacing: -.03em; }
+.external-evidence-metric span { margin-top: 6px; color: var(--ms-muted); font-size: 9px; line-height: 1.35; }
+.external-evidence-copy { min-width: 0; }
+.external-evidence-period { color: #a45b34; font: 700 8px/1 var(--code-font); letter-spacing: .04em; text-transform: uppercase; }
+.external-evidence-copy p { margin: 8px 0 0; color: var(--ms-text-2); font-size: 10px; line-height: 1.55; }
+.external-evidence-row > a { grid-column: 2; display: inline-flex; align-items: center; gap: 5px; width: fit-content; margin-top: -8px; color: #ad4c18; font: 700 8px/1 var(--code-font); text-decoration: none; }
+.external-evidence-row > a:hover { text-decoration: underline; }
+.external-evidence-row > a svg { width: 11px; height: 11px; }
+.external-evidence-foot { display: flex; justify-content: space-between; gap: 16px; padding: 12px 20px; color: var(--ms-muted); font-size: 9px; line-height: 1.4; }
+.external-evidence-foot .mono { flex: 0 0 auto; color: #a45b34; font-size: 8px; }
 
 /* Keep the inspect/simulate controls together in the Threat Intelligence table. */
 .attack-table td:last-child {
@@ -2058,6 +2078,13 @@ h1, .page-intro h1, .page-title-row h1 {
     height: 430px;
   }
 
+  .external-evidence-list { grid-template-columns: 1fr; }
+  .external-evidence-row, .external-evidence-row:nth-child(2n) { grid-template-columns: 1fr; border-right: 0; border-bottom: 1px solid var(--ms-line); }
+  .external-evidence-row:nth-last-child(-n+2) { border-bottom: 1px solid var(--ms-line); }
+  .external-evidence-row:last-child { border-bottom: 0; }
+  .external-evidence-row > a { grid-column: 1; margin-top: 0; }
+  .external-evidence-foot { flex-direction: column; gap: 7px; }
+
   .app-footer {
     width: calc(100% - 24px);
     align-items: flex-start;
@@ -2070,4 +2097,138 @@ h1, .page-intro h1, .page-title-row h1 {
   .robustness-heatmap { grid-template-columns: 100px repeat(4, minmax(58px, 1fr)); padding: 0 12px; overflow-x: auto; }
   .heatmap-cell { min-height: 58px; }
   .heatmap-detail { align-items: flex-start; flex-direction: column; margin: 14px 12px 0; }
+}
+
+/* Readable, consistent type scale across the console. */
+.eyebrow,
+.surface-kicker,
+.kpi-label,
+.foot-label,
+.field-block label,
+.metric-panel > span,
+.evaluation-controls label,
+th {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.builder-status,
+.cycle-badge,
+.calibration-chip,
+.status-badge,
+.network-live,
+.live-status,
+.feedback-chip {
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.surface-head h3 { font-size: 17px; }
+.network-panel p,
+.risk-engine-panel p,
+.fidelity-hero-panel p,
+.attack-landscape-panel p,
+.evaluation-head p { font-size: 11px; }
+
+.kpi-delta,
+.title-stat small,
+.metric-panel small,
+.tx-sub,
+.empty-state span,
+.feedback-node small,
+.matrix-foot,
+.history-item span,
+.history-stats,
+.runbook small,
+.queue-item small { font-size: 10px; }
+
+.title-stat > span,
+.field-block label,
+.selection-summary,
+.result-kpis span,
+.result-bar > div:last-child,
+.muted-text,
+.matrix-axis,
+.matrix-cell span,
+.importance-row b { font-size: 9px; }
+
+.scenario-option strong,
+.attack-name,
+.importance-row span,
+.principle-row strong { font-size: 11px; }
+.scenario-option small,
+.attack-id,
+.family-tag,
+.genai-copy,
+.sample-name strong,
+.sample-name span,
+.run-id,
+.chart-note,
+.signal-panel-head .mono,
+.sim-callout span,
+.pipeline-stage > span,
+.risk-engine-pipeline > div > span,
+.simulation-comparison span,
+.comparison-factors span,
+.matrix-cell small { font-size: 10px; }
+
+.decision { font-size: 10px; }
+.network-node strong { font-size: 10px; text-transform: uppercase; }
+.network-node small { font-size: 10px; }
+.network-caption,
+.network-legend,
+.landscape-rank,
+.landscape-name,
+.attack-bubble small,
+.heatmap-cell small { font-size: 10px; }
+.attack-bubble span { font-size: 10px; }
+.heatmap-corner,
+.heatmap-heading,
+.heatmap-row-label { font-size: 10px; text-transform: uppercase; }
+
+.risk-gauge span { font-size: 9px; }
+.evaluation-controls,
+.evaluation-controls > span { font-size: 10px; }
+.footer-brand span:not(.footer-circles),
+.app-footer { font-size: 10px; }
+
+/* Keep persistent navigation and status text readable on standard displays. */
+.tenant-stamp,
+.sidebar-footer,
+.side-card-meta,
+.nav-item,
+.nav-item kbd,
+.model-chip-label,
+.model-chip strong,
+.search-trigger,
+.search-trigger kbd,
+.date-label,
+.model-meta,
+.live-status,
+.feedback-chip { font-size: 10px; }
+.nav-item { font-size: 11px; }
+.intro-core span { font-size: 9px; }
+.network-live,
+.status-badge,
+.cycle-badge,
+.risk-status { font-size: 10px; }
+.sidebar-footer { line-height: 1.7; }
+.topbar { line-height: 1.3; }
+
+@media (max-width: 760px) {
+  .sidebar .nav-item span { font-size: 10px; font-weight: 600; }
+  .breadcrumbs strong { font-size: 10px; }
+  .feedback-chip span { font-size: 10px; }
+  .model-meta,
+  .live-status small { font-size: 10px; }
+  .network-node strong { font-size: 10px; }
+  .network-node small { font-size: 10px; }
+  .network-caption,
+  .network-legend { font-size: 10px; }
+  .heatmap-row-label { font-size: 10px; }
+  .heatmap-cell small { font-size: 10px; }
+  .app-footer,
+  .footer-brand span:not(.footer-circles) { font-size: 10px; }
 }

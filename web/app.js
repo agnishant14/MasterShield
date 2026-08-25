@@ -33,6 +33,41 @@ const REQUEST_TIMEOUTS_MS = { "/api/retrain": 120000, "/api/fidelity": 90000, "/
 const DISPLAY_TIME_ZONE = "Asia/Kolkata";
 const LIVE_OVERVIEW_REFRESH_MS = 15000;
 
+const INDIA_EXTERNAL_EVIDENCE = [
+  {
+    metric: "65.89 lakh+",
+    label: "financial-fraud complaints",
+    period: "India / 2021-2025",
+    detail: "NCRP and CFCFRMS recorded more than ₹55,050 crore in reported financial fraud. This supports coverage of social engineering, account takeover, mule networks, and transfer scams.",
+    source: "MHA / I4C via PIB",
+    url: "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2287039&reg=1&lang=1",
+  },
+  {
+    metric: "1,01,928",
+    label: "registered cybercrime cases",
+    period: "India / 2024",
+    detail: "NCRB data lists fraud as the largest named cybercrime head, with 29,758 cases. This supports fraud-focused prioritisation, not a production accuracy claim.",
+    source: "NCRB / MHA via PIB",
+    url: "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2287039&reg=1&lang=1",
+  },
+  {
+    metric: "23,658.35 Mn",
+    label: "monthly UPI transactions",
+    period: "India / July 2026",
+    detail: "NPCI reports ₹29,87,880.49 crore in monthly UPI value. This scale motivates real-time velocity, beneficiary, device, graph, and behavioural controls.",
+    source: "NPCI UPI statistics",
+    url: "https://www.npci.org.in/product/upi/product-statistics",
+  },
+  {
+    metric: "36,075",
+    label: "bank frauds reported",
+    period: "India / FY 2023-24",
+    detail: "RBI states that card and internet payments were the predominant fraud category by number, supporting payment-channel and digital-session risk signals.",
+    source: "RBI Annual Report 2023-24",
+    url: "https://rbi.org.in/scripts/AnnualReportPublications.aspx?Id=1406",
+  },
+];
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -130,6 +165,19 @@ function money(value, currency = "USD") {
 
 function refreshIcons() {
   if (window.lucide) window.lucide.createIcons({ attrs: { "stroke-width": 1.7 } });
+}
+
+function renderExternalEvidence() {
+  const container = $("#external-evidence-list");
+  if (!container) return;
+  container.innerHTML = INDIA_EXTERNAL_EVIDENCE.map((item) => `
+    <article class="external-evidence-row">
+      <div class="external-evidence-metric"><strong>${escapeHTML(item.metric)}</strong><span>${escapeHTML(item.label)}</span></div>
+      <div class="external-evidence-copy"><span class="external-evidence-period">${escapeHTML(item.period)}</span><p>${escapeHTML(item.detail)}</p></div>
+      <a href="${escapeHTML(item.url)}" target="_blank" rel="noreferrer" aria-label="Open ${escapeHTML(item.source)} source"><span>${escapeHTML(item.source)}</span><i data-lucide="external-link"></i></a>
+    </article>
+  `).join("");
+  refreshIcons();
 }
 
 function bindRevealMotion() {
@@ -448,7 +496,7 @@ function renderThreatLandscape(items) {
     if (matching) {
       state.selectedAttacks = new Set([matching.id]);
       switchView("simulate");
-      toast(`Focused simulation on ${matching.name}.`);
+      toast(`Simulation focused on ${matching.name}.`);
     }
   }));
 }
@@ -494,7 +542,7 @@ function renderThreatNetwork(rows) {
   const svg = `<svg class="network-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="network-gradient" x1="0" x2="1"><stop stop-color="#eb001b"/><stop offset=".5" stop-color="#ff5f00"/><stop offset=".82" stop-color="#f79e1b"/><stop offset="1" stop-color="#78bfc3"/></linearGradient><filter id="network-glow"><feGaussianBlur stdDeviation=".8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${edges.map(([from, to]) => `<line class="network-edge" data-edge-from="${escapeHTML(entities[from].key)}" data-edge-to="${escapeHTML(entities[to].key)}" x1="${entities[from].x}" y1="${entities[from].y}" x2="${entities[to].x}" y2="${entities[to].y}" />`).join("")}</svg>`;
   delete target.dataset.networkSelection;
   target.classList.remove("network-focus");
-  target.innerHTML = `${svg}<div class="network-grid-lines"></div>${entities.map((item) => `<button class="network-node ${item.tone} ${item.tx ? "transaction-node" : ""}" style="left:${item.x}%;top:${item.y}%" data-network-node="${escapeHTML(item.key)}" aria-label="Inspect ${escapeHTML(item.label)} ${escapeHTML(item.value)}" ${item.tx ? `data-network-transaction="${escapeHTML(row.id)}"` : ""}><span class="node-orbit"></span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(item.value)}</small></button>`).join("")}<div class="network-caption"><span class="status-dot"></span> Trace selected high-risk event / ${escapeHTML(row.id)}</div>`;
+  target.innerHTML = `${svg}<div class="network-grid-lines"></div>${entities.map((item) => `<button class="network-node ${item.tone} ${item.tx ? "transaction-node" : ""}" style="left:${item.x}%;top:${item.y}%" data-network-node="${escapeHTML(item.key)}" aria-label="Inspect ${escapeHTML(item.label)} ${escapeHTML(item.value)}" ${item.tx ? `data-network-transaction="${escapeHTML(row.id)}"` : ""}><span class="node-orbit"></span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(item.value)}</small></button>`).join("")}<div class="network-caption"><span class="status-dot"></span> Tracing selected high-risk event / ${escapeHTML(row.id)}</div>`;
   const nodes = $$('[data-network-node]', target);
   const edgesByNode = new Map(entities.map((item) => [item.key, new Set([item.key])]));
   edges.forEach(([from, to]) => {
@@ -552,7 +600,7 @@ function renderRobustnessHeatmap(data) {
   target.innerHTML = `<div class="heatmap-corner">DETECTION RECALL</div>${levels.map((level) => `<div class="heatmap-heading">${level}</div>`).join("")}${rows.map(([label, ...values]) => `<div class="heatmap-row-label">${label}</div>${values.map((value, index) => { const bounded = boundedRatio(value); const heatClass = bounded >= .85 ? "heat-high" : bounded >= .65 ? "heat-mid" : "heat-low"; return `<button class="heatmap-cell ${heatClass}" data-heat-label="${escapeHTML(label)}" data-heat-level="${levels[index]}" data-heat-value="${Number(value || 0)}" type="button"><strong>${pct(value, 0)}</strong><small>${index === 0 ? "observed" : index === 1 ? "stress" : index === 2 ? "high stress" : "edge case"}</small></button>`; }).join("")}`).join("")}`;
   $$('[data-heat-label]', target).forEach((cell) => cell.addEventListener("click", () => {
     const value = Number(cell.dataset.heatValue || 0);
-    $("#heatmap-detail").innerHTML = `<strong>${escapeHTML(cell.dataset.heatLabel)} / ${escapeHTML(cell.dataset.heatLevel)}</strong><span>Detection recall <b>${pct(value, 1)}</b> · synthetic evidence · confidence band is represented by the measured scenario output.</span>`;
+    $("#heatmap-detail").innerHTML = `<strong>${escapeHTML(cell.dataset.heatLabel)} / ${escapeHTML(cell.dataset.heatLevel)}</strong><span>Detection recall: <b>${pct(value, 1)}</b> · synthetic evidence from the measured scenario output.</span>`;
     $$('[data-heat-label]', target).forEach((other) => other.classList.toggle("selected", other === cell));
   }));
 }
@@ -582,8 +630,8 @@ function animateSimulationStory(result) {
   const controlsRisk = control ? Math.round(Number(control.risk_score || 0) * 100) : 0;
   $("#simulation-comparison")?.querySelector("div:first-child strong") && ($("#simulation-comparison").querySelector("div:first-child strong").textContent = controlsRisk);
   $("#simulation-comparison")?.querySelector(".critical-comparison strong") && ($("#simulation-comparison").querySelector(".critical-comparison strong").textContent = risk);
-  $("#simulation-comparison")?.querySelector("div:first-child small") && ($("#simulation-comparison").querySelector("div:first-child small").textContent = control ? "measured legitimate control" : "control unavailable");
-  $("#simulation-comparison")?.querySelector(".critical-comparison small") && ($("#simulation-comparison").querySelector(".critical-comparison small").textContent = `${pct(result.detection_rate, 0)} detected / action required`);
+  $("#simulation-comparison")?.querySelector("div:first-child small") && ($("#simulation-comparison").querySelector("div:first-child small").textContent = control ? "measured legitimate control sample" : "control unavailable");
+  $("#simulation-comparison")?.querySelector(".critical-comparison small") && ($("#simulation-comparison").querySelector(".critical-comparison small").textContent = `${pct(result.detection_rate, 0)} detection rate / action required`);
   const factors = $("#simulation-comparison")?.querySelector(".comparison-factors");
   if (factors && sample && control) factors.innerHTML = `
     <span>1-hour velocity <b>${Number(control.velocity_1h || 0).toFixed(0)} → ${Number(sample.velocity_1h || 0).toFixed(0)}</b></span>
@@ -822,7 +870,7 @@ function renderAttackTable() {
     return matchesSeverity && haystack.includes(query);
   });
   $("#attack-count").textContent = rows.length;
-  $("#attack-count-meta").textContent = `${state.attacks.length} total scenarios in catalog`;
+  $("#attack-count-meta").textContent = `${state.attacks.length} total scenarios in the catalog`;
   renderAttackBubbles(state.attacks);
   $("#attack-table-body").innerHTML = rows.length ? rows.map((attack) => {
     const detection = attack.detection_rate == null ? 0 : boundedRatio(attack.detection_rate);
@@ -873,11 +921,11 @@ function renderFeedbackQueue(items, message = "") {
     return;
   }
   if (!items.length) {
-    content.innerHTML = `<div class="queue-state"><i data-lucide="inbox"></i><strong>No queued feedback</strong><span>Run a simulation or submit analyst feedback to create hard cases.</span></div>`;
+    content.innerHTML = `<div class="queue-state"><i data-lucide="inbox"></i><strong>No feedback is queued.</strong><span>Run a simulation or submit analyst feedback to create hard cases.</span></div>`;
     refreshIcons();
     return;
   }
-  content.innerHTML = `<div class="queue-summary"><strong>${items.length}</strong><span>most recent queued items</span></div><div class="queue-list">${items.map((item) => {
+  content.innerHTML = `<div class="queue-summary"><strong>${items.length}</strong><span>most recently queued items</span></div><div class="queue-list">${items.map((item) => {
     const row = item.row || item;
     const category = item.category || item.outcome || "feedback";
     const risk = Number(row.risk_score);
@@ -980,7 +1028,7 @@ function openTransactionDialog(transactionId) {
   $("#transaction-dialog-content").innerHTML = `
     <div class="investigation-hero"><div class="investigation-score" style="--risk:${riskScore * 3.6}deg"><strong>${riskScore}</strong><span>${riskLabel} RISK</span></div><div><span class="investigation-status">${escapeHTML(String(row.decision || "review").toUpperCase())}</span><h3>${escapeHTML(row.attack_name || "Payment behavior review")}</h3><p>${escapeHTML(row.rail)} / ${escapeHTML(row.channel)} / ${escapeHTML(row.country || "unknown")}</p></div></div>
     <div class="detail-metrics"><div><span>AMOUNT</span><strong>${money(row.amount, row.currency)}</strong></div><div><span>CUSTOMER</span><strong class="mono">${escapeHTML(row.customer_id || "—")}</strong></div><div><span>DEVICE</span><strong class="mono">${escapeHTML(row.device_id || "—")}</strong></div></div>
-    <section class="detail-section"><span>WHY WAS THIS FLAGGED?</span>${explanations.length ? `<div class="reason-list">${explanations.map((item) => `<div class="reason-row"><span>${escapeHTML(item.label)}</span><div class="reason-bar"><i style="width:${Math.max(10, boundedRatio(item.contribution_share || item.contribution) * 100)}%"></i></div><b>${pct(item.contribution_share || 0, 0)}</b></div>`).join("")}</div>` : "<p>No elevated model contribution crossed the explanation floor.</p>"}</section>
+    <section class="detail-section"><span>WHY WAS THIS FLAGGED?</span>${explanations.length ? `<div class="reason-list">${explanations.map((item) => `<div class="reason-row"><span>${escapeHTML(item.label)}</span><div class="reason-bar"><i style="width:${Math.max(10, boundedRatio(item.contribution_share || item.contribution) * 100)}%"></i></div><b>${pct(item.contribution_share || 0, 0)}</b></div>`).join("")}</div>` : "<p>No model contribution exceeded the explanation threshold.</p>"}</section>
     <section class="detail-section ai-explanation"><span>AI EXPLANATION</span><p>This event deviates from its synthetic baseline across ${Math.max(1, explanations.length)} measured dimensions. The strongest factor is ${escapeHTML(explanations[0]?.label || "transaction context")}; the model has surfaced each contribution for analyst review.</p></section>
     <section class="detail-section"><span>ENTITY RELATIONSHIP</span><div class="entity-chain"><span><i data-lucide="user-round"></i>${escapeHTML(row.customer_id || "Customer")}</span><i data-lucide="arrow-right"></i><span><i data-lucide="smartphone"></i>${escapeHTML(row.device_id || "Device")}</span><i data-lucide="arrow-right"></i><span><i data-lucide="store"></i>${escapeHTML(row.merchant_id || "Merchant")}</span><i data-lucide="arrow-right"></i><span class="entity-risk"><i data-lucide="shield-alert"></i>${riskLabel}</span></div></section>
     <section class="detail-section recommendation"><span>RECOMMENDED ACTION</span><div><i data-lucide="badge-check"></i><p>${recommendedAction}</p></div></section>
@@ -1019,7 +1067,7 @@ function renderDefense() {
   $("#matrix-fp").textContent = matrix.fp;
   $("#matrix-tn").textContent = matrix.tn;
   const holdoutSize = Object.values(matrix).reduce((sum, value) => sum + value, 0);
-  $("#matrix-footnote").textContent = `Untouched generated holdout / N ${holdoutSize}.`;
+  $("#matrix-footnote").textContent = `Untouched generated holdout · ${holdoutSize} rows.`;
   const maxImportance = Math.max(0.01, ...importance.map((item) => Number(item.importance || 0)));
   $("#importance-list").innerHTML = importance.slice(0, 10).map((item) => `
     <div class="importance-row"><span title="${escapeHTML(item.label)}">${escapeHTML(item.label)}</span><div class="importance-bar"><i style="width:${Math.max(3, Number(item.importance || 0) / maxImportance * 100)}%"></i></div><b>${Number(item.importance || 0).toFixed(2)}</b></div>
@@ -1296,6 +1344,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderBreadcrumb("overview");
   revealActiveView("overview");
   refreshIcons();
+  renderExternalEvidence();
   bindRevealMotion();
   bindEvents();
   bindCommandPalette();

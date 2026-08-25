@@ -4,7 +4,7 @@
 
 ### Identify. Generate. Defend.
 
-**An explainable payment-security lab for GenAI-enabled fraud**
+**An explainable payment security lab for GenAI-enabled fraud defense**
 
 </div>
 
@@ -23,7 +23,7 @@ Identify threats → Generate synthetic attacks → Score and explain
 The platform includes:
 
 - 24 GenAI-enabled attack scenarios across cards, wallets, transfers, QR, identity, refunds, and acquiring
-- Correlated synthetic payment, device, behavioral, graph, biometric, and language signals
+- Correlated synthetic signals across payments, devices, behavior, graphs, biometrics, and language
 - Explainable hybrid risk scoring with approve, review, hold, step-up, and decline actions
 - Adaptive mutation search for detector blind spots
 - Challenger retraining with immutable holdout checks, promotion gates, audit history, and rollback
@@ -34,7 +34,7 @@ The platform includes:
 ```mermaid
 flowchart LR
     A[Attack catalog] --> B[Synthetic generator]
-    B --> C[24 feature enrichment]
+    B --> C[24-feature signal enrichment]
     C --> D[Explainable detector]
     D --> E[Policy decision]
     D --> F[Explanations and hard cases]
@@ -73,11 +73,11 @@ MASTERSHIELD_DB=work/mastershield.db python3 app.py
 ## 90-second demo
 
 1. Open **Security overview** and show the current risk posture.
-2. Search an attack in **Threat intelligence**.
+2. Search for an attack in **Threat intelligence**.
 3. Run it in **Simulation lab** at Base or High intensity.
 4. Inspect detections, misses, explanations, and control false positives.
-5. Submit feedback, retrain the challenger, and review promotion gates.
-6. Finish with **Fidelity** and adaptive mutation search.
+5. Submit feedback, retrain a challenger model, and review the promotion gates.
+6. Finish with **Fidelity** and the adaptive mutation search.
 
 ## API highlights
 
@@ -114,4 +114,3 @@ tests/                 deterministic system tests
 ## Safety boundary
 
 The red-team component mutates synthetic transaction features only. It does not generate phishing content, credentials, targets, evasion instructions, or live payment actions. Production integration would require tokenized events, durable storage, access controls, signed model artifacts, and confirmed fraud labels.
-
