@@ -600,7 +600,7 @@ function renderRobustnessHeatmap(data) {
   target.innerHTML = `<div class="heatmap-corner">DETECTION RECALL</div>${levels.map((level) => `<div class="heatmap-heading">${level}</div>`).join("")}${rows.map(([label, ...values]) => `<div class="heatmap-row-label">${label}</div>${values.map((value, index) => { const bounded = boundedRatio(value); const heatClass = bounded >= .85 ? "heat-high" : bounded >= .65 ? "heat-mid" : "heat-low"; return `<button class="heatmap-cell ${heatClass}" data-heat-label="${escapeHTML(label)}" data-heat-level="${levels[index]}" data-heat-value="${Number(value || 0)}" type="button"><strong>${pct(value, 0)}</strong><small>${index === 0 ? "observed" : index === 1 ? "stress" : index === 2 ? "high stress" : "edge case"}</small></button>`; }).join("")}`).join("")}`;
   $$('[data-heat-label]', target).forEach((cell) => cell.addEventListener("click", () => {
     const value = Number(cell.dataset.heatValue || 0);
-    $("#heatmap-detail").innerHTML = `<strong>${escapeHTML(cell.dataset.heatLabel)} / ${escapeHTML(cell.dataset.heatLevel)}</strong><span>Detection recall: <b>${pct(value, 1)}</b> · synthetic evidence from the measured scenario output.</span>`;
+    $("#heatmap-detail").innerHTML = `<strong>${escapeHTML(cell.dataset.heatLabel)} / ${escapeHTML(cell.dataset.heatLevel)}</strong><span>Detection recall: <b>${pct(value, 1)}</b> · synthetic evidence · the measured scenario output represents the confidence band.</span>`;
     $$('[data-heat-label]', target).forEach((other) => other.classList.toggle("selected", other === cell));
   }));
 }
@@ -1067,7 +1067,7 @@ function renderDefense() {
   $("#matrix-fp").textContent = matrix.fp;
   $("#matrix-tn").textContent = matrix.tn;
   const holdoutSize = Object.values(matrix).reduce((sum, value) => sum + value, 0);
-  $("#matrix-footnote").textContent = `Untouched generated holdout · ${holdoutSize} rows.`;
+  $("#matrix-footnote").textContent = `Untouched generated holdout / N = ${holdoutSize}.`;
   const maxImportance = Math.max(0.01, ...importance.map((item) => Number(item.importance || 0)));
   $("#importance-list").innerHTML = importance.slice(0, 10).map((item) => `
     <div class="importance-row"><span title="${escapeHTML(item.label)}">${escapeHTML(item.label)}</span><div class="importance-bar"><i style="width:${Math.max(3, Number(item.importance || 0) / maxImportance * 100)}%"></i></div><b>${Number(item.importance || 0).toFixed(2)}</b></div>

@@ -555,7 +555,7 @@ input:focus-visible,
 .brand-sub,
 .tenant-stamp,
 .sidebar-footer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.brand-sub { color: #a9a9a6; font-size: 9px; letter-spacing: .06em; }
+.brand-sub { color: #a9a9a6; font-size: 8px; letter-spacing: .08em; }
 .tenant-stamp {
   margin: 16px 14px 8px;
   border-color: #313131;
@@ -1771,7 +1771,7 @@ tbody tr:hover { background: #fff9f5; }
   gap: 12px;
   padding: 0 4px 14px;
   color: var(--ms-muted);
-  font-size: 10px;
+  font-size: 9px;
 }
 .evaluation-controls label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 700; letter-spacing: .04em; }
 .evaluation-controls output { min-width: 30px; color: var(--ms-text); font-family: var(--code-font); font-size: 10px; }
@@ -2172,21 +2172,21 @@ th {
 .risk-engine-pipeline > div > span,
 .simulation-comparison span,
 .comparison-factors span,
-.matrix-cell small { font-size: 10px; }
+.matrix-cell small { font-size: 9px; }
 
-.decision { font-size: 10px; }
-.network-node strong { font-size: 10px; text-transform: uppercase; }
+.decision { font-size: 9px; }
+.network-node strong { font-size: 9px; text-transform: uppercase; }
 .network-node small { font-size: 10px; }
 .network-caption,
 .network-legend,
 .landscape-rank,
 .landscape-name,
 .attack-bubble small,
-.heatmap-cell small { font-size: 10px; }
+.heatmap-cell small { font-size: 9px; }
 .attack-bubble span { font-size: 10px; }
 .heatmap-corner,
 .heatmap-heading,
-.heatmap-row-label { font-size: 10px; text-transform: uppercase; }
+.heatmap-row-label { font-size: 9px; text-transform: uppercase; }
 
 .risk-gauge span { font-size: 9px; }
 .evaluation-controls,
@@ -2194,41 +2194,18 @@ th {
 .footer-brand span:not(.footer-circles),
 .app-footer { font-size: 10px; }
 
-/* Keep persistent navigation and status text readable on standard displays. */
-.tenant-stamp,
-.sidebar-footer,
-.side-card-meta,
-.nav-item,
-.nav-item kbd,
-.model-chip-label,
-.model-chip strong,
-.search-trigger,
-.search-trigger kbd,
-.date-label,
-.model-meta,
-.live-status,
-.feedback-chip { font-size: 10px; }
-.nav-item { font-size: 11px; }
-.intro-core span { font-size: 9px; }
-.network-live,
-.status-badge,
-.cycle-badge,
-.risk-status { font-size: 10px; }
-.sidebar-footer { line-height: 1.7; }
-.topbar { line-height: 1.3; }
-
 @media (max-width: 760px) {
-  .sidebar .nav-item span { font-size: 10px; font-weight: 600; }
-  .breadcrumbs strong { font-size: 10px; }
+  .sidebar .nav-item span { font-size: 9px; font-weight: 600; }
+  .breadcrumbs strong { font-size: 9px; }
   .feedback-chip span { font-size: 10px; }
   .model-meta,
   .live-status small { font-size: 10px; }
-  .network-node strong { font-size: 10px; }
-  .network-node small { font-size: 10px; }
+  .network-node strong { font-size: 9px; }
+  .network-node small { font-size: 9px; }
   .network-caption,
-  .network-legend { font-size: 10px; }
-  .heatmap-row-label { font-size: 10px; }
-  .heatmap-cell small { font-size: 10px; }
+  .network-legend { font-size: 9px; }
+  .heatmap-row-label { font-size: 9px; }
+  .heatmap-cell small { font-size: 9px; }
   .app-footer,
   .footer-brand span:not(.footer-circles) { font-size: 10px; }
 }
