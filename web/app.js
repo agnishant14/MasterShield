@@ -295,6 +295,12 @@ function requireCapability(capability) {
   return false;
 }
 
+function renderBreadcrumb(viewName) {
+  const navLabel = $(`.nav-item[data-view="${viewName}"] span`)?.textContent || viewName.replaceAll("-", " ");
+  const compact = window.matchMedia("(max-width: 760px)").matches;
+  $("#crumb-view").textContent = (compact ? navLabel.split(" ").at(-1) : navLabel).toUpperCase();
+}
+
 function switchView(viewName) {
   const previousView = document.body.dataset.view;
   document.body.dataset.view = viewName;
@@ -305,8 +311,7 @@ function switchView(viewName) {
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
-  const navLabel = $(`.nav-item[data-view="${viewName}"] span`)?.textContent;
-  $("#crumb-view").textContent = (navLabel || viewName.replaceAll("-", " ")).toUpperCase();
+  renderBreadcrumb(viewName);
   if (previousView !== viewName) window.scrollTo({ top: 0, behavior: "smooth" });
   if (viewName === "attacks") renderAttackTable();
   if (viewName === "simulate") renderScenarioPicker();
@@ -1188,6 +1193,7 @@ function bindEvents() {
   $("#transaction-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
   $("#attack-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
   window.addEventListener("resize", () => {
+    renderBreadcrumb(document.body.dataset.view || "overview");
     if (!state.overview) return;
     if ($("#view-overview").classList.contains("active")) drawBoundaryChart(state.overview);
     if ($("#view-evidence").classList.contains("active")) drawEvaluationCurves(state.overview);
@@ -1196,6 +1202,7 @@ function bindEvents() {
 
 document.addEventListener("DOMContentLoaded", () => {
   document.body.dataset.view = "overview";
+  renderBreadcrumb("overview");
   refreshIcons();
   bindRevealMotion();
   bindEvents();

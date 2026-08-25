@@ -1812,3 +1812,47 @@ button:focus-visible, input:focus-visible { outline-color: rgba(255,95,0,.36); o
   .boundary-foot > div { border-bottom-color: var(--ms-line); }
   .comparison-factors { border-top-color: var(--ms-line); }
 }
+
+/* Final typography and compact-header fixes. */
+:root {
+  --ui-font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --code-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+body, button, input, textarea, select,
+h1, h2, h3, p, .nav-item, .brand-name, .brand-sub, .tenant-stamp,
+.eyebrow, .surface-kicker, .kpi-label, .kpi-delta, .foot-label,
+.filter-button, .segmented button, th, td, .decision, .app-footer {
+  font-family: var(--ui-font);
+  letter-spacing: 0;
+}
+
+.mono, .tx-main, .model-name, .model-chip strong, .model-meta, .run-id,
+.step-stat, .kpi-value, .breadcrumbs, .live-status small, .timeline-time,
+.system-status-list strong, .network-node strong, .network-node small {
+  font-family: var(--code-font);
+  letter-spacing: 0;
+}
+
+h1, .page-intro h1, .page-title-row h1 {
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.intro-copy, .page-title-row p { line-height: 1.6; }
+.topbar-actions, .live-status, .feedback-chip { min-width: 0; }
+.live-status, .feedback-chip { white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .breadcrumbs { min-width: 0; }
+  .breadcrumbs strong {
+    display: block;
+    max-width: 92px;
+    overflow: hidden;
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-actions { gap: 7px; }
+  .live-status { padding-right: 7px; font-size: 10px; }
+}
