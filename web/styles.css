@@ -2195,7 +2195,18 @@ th {
 .app-footer { font-size: 10px; }
 
 @media (max-width: 760px) {
-  .sidebar .nav-item span { font-size: 9px; font-weight: 600; }
+  /* Keep the fixed phone labels readable without splitting a word mid-label. */
+  .sidebar .nav-item span {
+    width: auto;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+    font-size: clamp(7px, 2.15vw, 9px);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
   .breadcrumbs strong { font-size: 9px; }
   .feedback-chip span { font-size: 10px; }
   .model-meta,
