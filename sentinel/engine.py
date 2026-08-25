@@ -326,6 +326,10 @@ class DefenseEngine:
                 "detection_rate": round(len(detected) / max(1, count), 4),
                 "mean_risk": round(sum(row["risk_score"] for row in annotated_attacks) / max(1, count), 4),
                 "feedback_ready": len(self.feedback_rows),
+                # Include the current queue snapshot so clients can render the
+                # queue immediately even when a follow-up request lands on a
+                # different short-lived server instance.
+                "feedback_items": self.feedback_queue(500),
                 "feedback_buckets": self._feedback_bucket_counts(),
                 "sample": list(reversed(annotated_attacks[-12:])),
                 "control_sample": annotated_controls[-1] if annotated_controls else None,

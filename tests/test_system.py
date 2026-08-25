@@ -250,6 +250,14 @@ class ClosedLoopTests(unittest.TestCase):
         self.assertEqual(3, result["candidate_count"])
         self.assertIn("safety", result)
 
+    def test_feedback_queue_keeps_large_queue_visible(self) -> None:
+        engine = DefenseEngine(seed=2090)
+        run = engine.simulate(["atk-001"], count=340)
+        self.assertEqual(340, run["feedback_ready"])
+        self.assertEqual(340, len(run["feedback_items"]))
+        self.assertEqual(340, engine.overview()["feedback_queue_size"])
+        self.assertEqual(340, len(engine.feedback_queue(500)))
+
     def test_score_requires_schema(self) -> None:
         with self.assertRaises(ValueError):
             self.engine.score_transaction({})

@@ -5,6 +5,7 @@ const state = {
   intensity: 1.0,
   severityFilter: "all",
   feedbackQueued: 0,
+  feedbackItems: [],
   transactionIndex: new Map(),
   connectionMode: "loading",
   capabilities: null,
@@ -207,12 +208,15 @@ function isOfflineDemo() {
 async function requestJSON(url, options = {}) {
   if (isOfflineDemo()) {
     const demo = window.MASTERSHIELD_DEMO;
+    const requestPath = new URL(url, window.location.href).pathname;
     if (url === "/api/health") return { status: "offline", api_version: "offline-demo", capabilities: OFFLINE_CAPABILITIES, model_version: `hybrid-logit-c${demo.overview.cycle}` };
     if (url === "/api/overview") return structuredClone(demo.overview);
     if (url === "/api/attacks") return { attacks: structuredClone(demo.attacks) };
     if (url === "/api/transactions") return { transactions: structuredClone(demo.overview.recent_transactions || []) };
     if (url === "/api/simulations") return { simulations: [] };
-    if (url === "/api/feedback" && options.method !== "POST") return { feedback: [] };
+    if (requestPath === "/api/feedback" && options.method !== "POST") {
+      return { feedback: structuredClone(demo.overview.feedback || demo.overview.feedback_items || []) };
+    }
     if (url === "/api/fidelity") {
       const metrics = demo.overview.metrics || {};
       const recall = Number(metrics.recall || 0);
@@ -920,6 +924,14 @@ function renderFeedbackQueue(items, message = "") {
     refreshIcons();
     return;
   }
+  if (!items.length && state.feedbackItems.length) {
+    items = state.feedbackItems;
+  }
+  if (!items.length && state.feedbackQueued > 0) {
+    content.innerHTML = `<div class="queue-state"><i data-lucide="inbox"></i><strong>${escapeHTML(compactNumber(state.feedbackQueued))} feedback rows queued.</strong><span>The queue count is available, but item details are still syncing. Refresh the queue shortly.</span></div>`;
+    refreshIcons();
+    return;
+  }
   if (!items.length) {
     content.innerHTML = `<div class="queue-state"><i data-lucide="inbox"></i><strong>No feedback is queued.</strong><span>Run a simulation or submit analyst feedback to create hard cases.</span></div>`;
     refreshIcons();
@@ -940,7 +952,9 @@ async function openFeedbackQueue() {
   renderFeedbackQueue([], "Loading queued feedback...");
   try {
     const payload = await requestJSON("/api/feedback?limit=500");
-    renderFeedbackQueue(Array.isArray(payload.feedback) ? payload.feedback : []);
+    const items = Array.isArray(payload.feedback) ? payload.feedback : [];
+    if (items.length || state.feedbackQueued === 0) state.feedbackItems = items;
+    renderFeedbackQueue(items);
   } catch (error) {
     renderFeedbackQueue([], `Queue unavailable: ${error.message}`);
   }
@@ -983,6 +997,7 @@ function renderSimulationResult(result) {
     <div class="sample-row"><div class="sample-name"><strong>${escapeHTML(row.attack_name)}</strong><span>${escapeHTML(row.id)} / ${escapeHTML(row.rail)}</span></div><div class="sample-risk">${pct(row.risk_score, 0)} risk</div>${decisionHTML(row.decision)}</div>
   `).join("");
   state.feedbackQueued = result.feedback_ready;
+  state.feedbackItems = Array.isArray(result.feedback_items) ? result.feedback_items : state.feedbackItems;
   $("#simulation-queue").textContent = result.feedback_ready;
   $("#side-feedback").textContent = `${result.feedback_ready} queued`;
   $("#topbar-feedback").textContent = `${result.feedback_ready} queued`;
@@ -1235,6 +1250,7 @@ async function retrainModel() {
   try {
     const result = await requestJSON("/api/retrain", { method: "POST", body: "{}" });
     state.feedbackQueued = 0;
+    state.feedbackItems = [];
     $("#simulation-queue").textContent = "0";
     await refreshData();
     const f1Delta = result.deltas.f1;
