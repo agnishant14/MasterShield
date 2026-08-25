@@ -9,6 +9,7 @@ const state = {
   connectionMode: "loading",
   capabilities: null,
   fidelity: null,
+  fidelityLoading: false,
   mutation: null,
 };
 
@@ -229,6 +230,7 @@ function requireCapability(capability) {
 }
 
 function switchView(viewName) {
+  const previousView = document.body.dataset.view;
   document.body.dataset.view = viewName;
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${viewName}`));
   $$(".nav-item").forEach((item) => {
@@ -237,8 +239,9 @@ function switchView(viewName) {
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
-  $("#crumb-view").textContent = viewName.replaceAll("-", " ").toUpperCase();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  const navLabel = $(`.nav-item[data-view="${viewName}"] span`)?.textContent;
+  $("#crumb-view").textContent = (navLabel || viewName.replaceAll("-", " ")).toUpperCase();
+  if (previousView !== viewName) window.scrollTo({ top: 0, behavior: "smooth" });
   if (viewName === "attacks") renderAttackTable();
   if (viewName === "simulate") renderScenarioPicker();
   if (viewName === "defense") { renderDefense(); activatePipeline("#risk-engine-pipeline"); }
@@ -377,8 +380,9 @@ function renderAttackBubbles(items) {
   const rows = Array.isArray(items) ? items.slice(0, 16) : [];
   const max = Math.max(1, ...rows.map((item) => Number(item.samples || 0)));
   target.innerHTML = rows.length ? rows.map((item, index) => {
-    const size = 54 + (Number(item.samples || 0) / max) * 48;
-    return `<button class="attack-bubble severity-${escapeHTML(item.severity || "Medium")}" style="--bubble-size:${size}px;--bubble-x:${12 + ((index * 29) % 78)}%;--bubble-y:${24 + ((index * 41) % 54)}%" data-bubble-attack="${escapeHTML(item.attack_id)}" type="button" title="Focus ${escapeHTML(item.name)}"><span>${escapeHTML(item.name)}</span><small>${item.samples || 0} events</small></button>`;
+    const samples = Number(item.samples || 0);
+    const size = 54 + (samples / max) * 48;
+    return `<button class="attack-bubble severity-${escapeHTML(item.severity || "Medium")}" style="--bubble-size:${size}px;--bubble-x:${12 + ((index * 29) % 78)}%;--bubble-y:${24 + ((index * 41) % 54)}%" data-bubble-attack="${escapeHTML(item.attack_id || item.id)}" type="button" title="Focus ${escapeHTML(item.name)}"><span>${escapeHTML(item.name)}</span><small>${samples} event${samples === 1 ? "" : "s"}</small></button>`;
   }).join("") : `<div class="network-empty">No attack samples in the current stream.</div>`;
   $$('[data-bubble-attack]', target).forEach((button) => button.addEventListener("click", () => {
     const attack = state.attacks.find((item) => item.id === button.dataset.bubbleAttack);
@@ -543,8 +547,11 @@ function drawBoundaryChart(data) {
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
   const ratio = Math.max(1, window.devicePixelRatio || 1);
-  canvas.width = Math.max(320, Math.floor(rect.width * ratio));
-  canvas.height = Math.floor(240 * ratio);
+  // Size the backing store from the measured box; the CSS height differs per breakpoint.
+  const cssWidth = Math.max(160, rect.width || 660);
+  const cssHeight = Math.max(120, rect.height || 240);
+  canvas.width = Math.floor(cssWidth * ratio);
+  canvas.height = Math.floor(cssHeight * ratio);
   const ctx = canvas.getContext("2d");
   ctx.scale(ratio, ratio);
   const width = canvas.width / ratio;
@@ -916,11 +923,15 @@ async function loadData() {
 
 async function loadFidelity() {
   if (!requireCapability("fidelity")) return;
+  if (state.fidelityLoading) return;
+  state.fidelityLoading = true;
   try {
     const result = await requestJSON("/api/fidelity");
     renderFidelity(result);
   } catch (error) {
     toast(`Evidence run failed: ${error.message}`);
+  } finally {
+    state.fidelityLoading = false;
   }
 }
 
@@ -1024,7 +1035,10 @@ async function retrainModel() {
 }
 
 function bindEvents() {
-  $$('[data-view]').forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
+  // document.body also carries data-view: it drives the body[data-view="..."] theme
+  // selectors in styles.css. Binding it here would make every bubbled click on the
+  // page re-run switchView, which scrolls the document back to the top.
+  $$('[data-view]').filter((node) => node !== document.body).forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
   $("#attack-search")?.addEventListener("input", renderAttackTable);
   $$(".filter-button").forEach((button) => button.addEventListener("click", () => {
     state.severityFilter = button.dataset.filter;
@@ -1088,7 +1102,11 @@ function bindEvents() {
   $$('[data-dialog-close]').forEach((button) => button.addEventListener("click", () => $("#" + button.dataset.dialogClose).close()));
   $("#transaction-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
   $("#attack-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
-  window.addEventListener("resize", () => state.overview && $("#view-overview").classList.contains("active") && drawBoundaryChart(state.overview));
+  window.addEventListener("resize", () => {
+    if (!state.overview) return;
+    if ($("#view-overview").classList.contains("active")) drawBoundaryChart(state.overview);
+    if ($("#view-evidence").classList.contains("active")) drawEvaluationCurves(state.overview);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
