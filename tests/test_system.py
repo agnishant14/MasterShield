@@ -178,6 +178,7 @@ class ClosedLoopTests(unittest.TestCase):
         previous_cycle = self.engine.cycle
         run = self.engine.simulate(["atk-016", "atk-018"], count=25, intensity=1.05)
         self.assertEqual(25, run["feedback_ready"])
+        self.assertEqual(run["feedback_ready"], len(self.engine.feedback_queue(500)))
         result = self.engine.retrain()
         self.assertEqual(previous_cycle + 1, result["cycle"])
         self.assertEqual(0, len(self.engine.feedback_rows))

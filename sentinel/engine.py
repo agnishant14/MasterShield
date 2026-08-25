@@ -567,8 +567,23 @@ class DefenseEngine:
             bounded = max(0, min(int(limit), 500))
             if bounded == 0:
                 return []
-            if self.feedback_records:
-                return list(reversed(self.feedback_records[-bounded:]))
+            # The UI badge reports feedback_rows, which is the exact set consumed
+            # by retraining. Return that same queue here rather than the broader
+            # feedback audit history, otherwise the badge and dialog can disagree.
+            if self.feedback_rows:
+                categories = {
+                    str(item.get("transaction_id")): item.get("category", item.get("outcome"))
+                    for item in self.feedback_records
+                    if item.get("transaction_id")
+                }
+                queued = []
+                for row in reversed(self.feedback_rows[-bounded:]):
+                    item = {"transaction_id": row.get("id"), "row": dict(row)}
+                    category = categories.get(str(row.get("id")))
+                    if category:
+                        item["category"] = category
+                    queued.append(item)
+                return queued
             return [item.get("payload", item) for item in self.store.list("feedback", bounded)]
 
     def _p95_latency(self) -> float:

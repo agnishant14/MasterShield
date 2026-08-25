@@ -13,6 +13,7 @@ const state = {
   mutation: null,
   securityScore: null,
   overviewRefreshing: false,
+  evaluationThreshold: null,
 };
 
 const API_CONTROLS = {
@@ -723,16 +724,40 @@ function drawEvaluationCurves(data) {
     const fp = (legitimate[legitimate.length - index - 1] || 0) + (index ? fpr[index - 1] * totalNormal : 0);
     return [Math.min(1, tp / Math.max(1, tp + fp)), tpr[index] ?? 0];
   })];
-  const drawGraph = (originX, originY, title, xLabel, yLabel, curve, color) => {
+  if (!Number.isFinite(state.evaluationThreshold)) state.evaluationThreshold = boundedRatio(data?.metrics?.threshold ?? .5);
+  const threshold = boundedRatio(state.evaluationThreshold);
+  const thresholdControl = $("#evaluation-threshold");
+  const thresholdOutput = $("#evaluation-threshold-value");
+  if (thresholdControl && document.activeElement !== thresholdControl) thresholdControl.value = threshold.toFixed(2);
+  if (thresholdOutput) thresholdOutput.textContent = threshold.toFixed(2);
+  const operatingIndex = Math.max(0, Math.min(points - 1, Math.round((1 - threshold) * (points - 1))));
+  const operatingFpr = fpr[operatingIndex] ?? 0;
+  const operatingTpr = tpr[operatingIndex] ?? 0;
+  const operatingPr = precisionRecall[operatingIndex + 1] || [1, 0];
+  const drawGraph = (originX, originY, title, xLabel, yLabel, curve, color, marker) => {
     ctx.strokeStyle = "rgba(117,98,82,.16)"; ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i += 1) { const y = originY + graphH * i / 4; ctx.beginPath(); ctx.moveTo(originX, y); ctx.lineTo(originX + graphW, y); ctx.stroke(); const x = originX + graphW * i / 4; ctx.beginPath(); ctx.moveTo(x, originY); ctx.lineTo(x, originY + graphH); ctx.stroke(); }
-    ctx.fillStyle = "#3e3935"; ctx.font = "600 9px ui-monospace, monospace"; ctx.fillText(title, originX, originY - 9); ctx.fillStyle = "#7b726b"; ctx.font = "500 8px ui-monospace, monospace"; ctx.fillText(xLabel, Math.max(originX, originX + graphW - 62), originY + graphH + 20); ctx.save(); ctx.translate(originX - 28, originY + graphH / 2 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, 0, 0); ctx.restore();
+    ctx.fillStyle = "#3e3935"; ctx.font = "600 9px ui-monospace, monospace"; ctx.fillText(title, originX, originY - 9); ctx.fillStyle = "#7b726b"; ctx.font = "500 8px ui-monospace, monospace"; const xLabelWidth = ctx.measureText(xLabel).width; ctx.fillText(xLabel, Math.max(originX, originX + graphW - xLabelWidth), originY + graphH + 20); ctx.save(); ctx.translate(originX - 28, originY + graphH / 2 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, 0, 0); ctx.restore();
     ctx.save(); ctx.beginPath(); curve.forEach(([x, y], index) => { const px = originX + x * graphW; const py = originY + (1 - y) * graphH; index ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
+    if (marker) {
+      const markerX = originX + marker[0] * graphW;
+      const markerY = originY + (1 - marker[1]) * graphH;
+      ctx.save();
+      ctx.strokeStyle = "rgba(23,23,23,.28)";
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(markerX, originY); ctx.lineTo(markerX, originY + graphH); ctx.moveTo(originX, markerY); ctx.lineTo(originX + graphW, markerY); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#171717"; ctx.beginPath(); ctx.arc(markerX, markerY, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(markerX, markerY, 8, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
   };
-  drawGraph(pad.left, pad.top, "ROC CURVE", "false positive rate", "true positive rate", rocPoints, "#ff5f00");
-  drawGraph(compact ? pad.left : pad.left + graphW + graphGap, compact ? pad.top + graphH + graphGap : pad.top, "PRECISION / RECALL", "recall", "precision", precisionRecall.map(([precision, recall]) => [recall, precision]), "#f79e1b");
+  drawGraph(pad.left, pad.top, "ROC CURVE", "false positive rate", "true positive rate", rocPoints, "#ff5f00", [operatingFpr, operatingTpr]);
+  drawGraph(compact ? pad.left : pad.left + graphW + graphGap, compact ? pad.top + graphH + graphGap : pad.top, "PRECISION / RECALL", "recall", "precision", precisionRecall.map(([precision, recall]) => [recall, precision]), "#f79e1b", [operatingPr[1], operatingPr[0]]);
   $("#evaluation-auc") && ($("#evaluation-auc").textContent = Number(data?.metrics?.auc || 0).toFixed(3));
   $("#evaluation-pr-auc") && ($("#evaluation-pr-auc").textContent = Number(data?.metrics?.pr_auc || 0).toFixed(3));
+  $("#evaluation-operating-point") && ($("#evaluation-operating-point").textContent = `${pct(operatingTpr)} recall · ${pct(operatingFpr)} FPR`);
 }
 
 function renderOverview() {
@@ -833,6 +858,46 @@ function openAttackDialog(attackId) {
   refreshIcons();
 }
 
+function queueCategoryLabel(category) {
+  return String(category || "feedback")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function renderFeedbackQueue(items, message = "") {
+  const content = $("#queue-dialog-content");
+  if (!content) return;
+  if (message) {
+    content.innerHTML = `<div class="queue-state"><i data-lucide="loader-circle"></i><strong>${escapeHTML(message)}</strong></div>`;
+    refreshIcons();
+    return;
+  }
+  if (!items.length) {
+    content.innerHTML = `<div class="queue-state"><i data-lucide="inbox"></i><strong>No queued feedback</strong><span>Run a simulation or submit analyst feedback to create hard cases.</span></div>`;
+    refreshIcons();
+    return;
+  }
+  content.innerHTML = `<div class="queue-summary"><strong>${items.length}</strong><span>most recent queued items</span></div><div class="queue-list">${items.map((item) => {
+    const row = item.row || item;
+    const category = item.category || item.outcome || "feedback";
+    const risk = Number(row.risk_score);
+    return `<article class="queue-item"><div class="queue-item-head"><strong>${escapeHTML(row.id || item.transaction_id || "Unknown transaction")}</strong><span>${escapeHTML(queueCategoryLabel(category))}</span></div><div class="queue-item-meta"><span>${escapeHTML(row.attack_name || row.attack_id || row.rail || "Synthetic event")}</span>${Number.isFinite(risk) ? `<b>${pct(risk, 0)} risk</b>` : ""}</div><small>${escapeHTML(row.decision ? `${row.decision} decision` : "Awaiting retraining")}</small></article>`;
+  }).join("")}</div>`;
+}
+
+async function openFeedbackQueue() {
+  const dialog = $("#queue-dialog");
+  if (!dialog) return;
+  dialog.showModal();
+  renderFeedbackQueue([], "Loading queued feedback...");
+  try {
+    const payload = await requestJSON("/api/feedback?limit=500");
+    renderFeedbackQueue(Array.isArray(payload.feedback) ? payload.feedback : []);
+  } catch (error) {
+    renderFeedbackQueue([], `Queue unavailable: ${error.message}`);
+  }
+}
+
 function renderScenarioPicker() {
   const container = $("#scenario-picker");
   if (!container) return;
@@ -872,6 +937,7 @@ function renderSimulationResult(result) {
   state.feedbackQueued = result.feedback_ready;
   $("#simulation-queue").textContent = result.feedback_ready;
   $("#side-feedback").textContent = `${result.feedback_ready} queued`;
+  $("#topbar-feedback").textContent = `${result.feedback_ready} queued`;
   $("#loop-queue").textContent = `${result.feedback_ready} rows`;
   animateSimulationStory(result);
 }
@@ -1153,6 +1219,10 @@ function bindEvents() {
   $("#volume-slider")?.addEventListener("input", (event) => {
     $("#volume-output").textContent = `${event.target.value} events`;
   });
+  $("#evaluation-threshold")?.addEventListener("input", (event) => {
+    state.evaluationThreshold = boundedRatio(event.target.value);
+    if (state.overview) drawEvaluationCurves(state.overview);
+  });
   $$("#intensity-picker button").forEach((button) => button.addEventListener("click", () => {
     state.intensity = Number(button.dataset.intensity);
     $$("#intensity-picker button").forEach((item) => {
@@ -1187,6 +1257,15 @@ function bindEvents() {
   $("#refresh-fidelity")?.addEventListener("click", loadFidelity);
   $("#export-report")?.addEventListener("click", exportReport);
   $("#run-mutation")?.addEventListener("click", runMutation);
+  $(".feedback-chip")?.addEventListener("click", openFeedbackQueue);
+  $(".feedback-chip")?.setAttribute("role", "button");
+  $(".feedback-chip")?.setAttribute("tabindex", "0");
+  $(".feedback-chip")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openFeedbackQueue();
+    }
+  });
   $("#refresh-overview")?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -1203,6 +1282,7 @@ function bindEvents() {
   $$('[data-dialog-close]').forEach((button) => button.addEventListener("click", () => $("#" + button.dataset.dialogClose).close()));
   $("#transaction-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
   $("#attack-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
+  $("#queue-dialog").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
   window.addEventListener("resize", () => {
     renderBreadcrumb(document.body.dataset.view || "overview");
     if (!state.overview) return;

@@ -628,6 +628,8 @@ input:focus-visible,
 .model-chip-label { color: var(--muted); font-size: 7px; line-height: 1; letter-spacing: .08em; }
 .model-chip strong { font: 500 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .feedback-chip svg { width: 14px; height: 14px; color: var(--red); }
+.feedback-chip { cursor: pointer; }
+.feedback-chip:focus-visible { outline: 2px solid rgba(255,95,0,.42); outline-offset: 3px; }
 
 .view { padding: 28px 34px 56px; max-width: 1500px; }
 .page-intro {
@@ -844,6 +846,23 @@ td { font-size: 11px; }
 .detail-metrics strong { display: block; margin-top: 7px; font-size: 13px; }
 .detail-section { margin-top: 22px; }
 .detail-section p { margin: 8px 0 0; color: #454440; line-height: 1.6; }
+.queue-dialog { width: min(620px, calc(100vw - 32px)); }
+.queue-summary { display: flex; align-items: baseline; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--ms-line); }
+.queue-summary strong { font: 500 28px/1 var(--code-font); }
+.queue-summary span { color: var(--ms-muted); font-size: 10px; }
+.queue-list { display: grid; gap: 9px; margin-top: 14px; }
+.queue-item { padding: 13px 14px; border: 1px solid var(--ms-line); border-radius: 12px; background: var(--ms-surface-2); }
+.queue-item-head, .queue-item-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.queue-item-head strong { min-width: 0; overflow: hidden; font: 600 10px/1.2 var(--code-font); text-overflow: ellipsis; white-space: nowrap; }
+.queue-item-head span { flex: 0 0 auto; color: #9c5e38; font-size: 9px; font-weight: 700; }
+.queue-item-meta { margin-top: 8px; color: var(--ms-text-2); font-size: 10px; }
+.queue-item-meta span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-item-meta b { flex: 0 0 auto; color: var(--ms-text); font: 600 9px/1 var(--code-font); }
+.queue-item small { display: block; margin-top: 7px; color: var(--ms-muted); font-size: 9px; }
+.queue-state { min-height: 150px; display: grid; place-items: center; align-content: center; gap: 8px; color: var(--ms-muted); text-align: center; }
+.queue-state svg { width: 24px; height: 24px; color: var(--ms-orange); }
+.queue-state strong { color: var(--ms-text); font-size: 12px; }
+.queue-state span { max-width: 280px; font-size: 10px; line-height: 1.5; }
 .reason-list { display: grid; gap: 10px; margin-top: 10px; }
 .reason-row { display: grid; grid-template-columns: 150px 1fr 42px; align-items: center; gap: 10px; font-size: 11px; }
 .reason-bar { height: 6px; border-radius: 999px; overflow: hidden; background: #e8e5e0; }
@@ -1745,6 +1764,19 @@ tbody tr:hover { background: #fff9f5; }
 .evaluation-badges span { color: var(--ms-muted); border-color: var(--ms-line); background: var(--ms-surface-2); }
 .evaluation-badges b { color: var(--ms-text); }
 #evaluation-curves { border-top-color: var(--ms-line); }
+.evaluation-controls {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px 14px;
+  color: var(--ms-muted);
+  font-size: 9px;
+}
+.evaluation-controls label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 700; letter-spacing: .04em; }
+.evaluation-controls output { min-width: 30px; color: var(--ms-text); font-family: var(--code-font); font-size: 10px; }
+.evaluation-controls input { width: 100%; accent-color: var(--ms-orange); cursor: pointer; }
+.evaluation-controls > span { color: var(--ms-text-2); font-family: var(--code-font); font-size: 9px; white-space: nowrap; }
 
 .detail-dialog, .command-palette { color: var(--ms-text); background: #fff; border-color: var(--ms-line); box-shadow: 0 26px 80px rgba(37,27,22,.22); }
 .detail-dialog::backdrop, .command-palette::backdrop { background: rgba(40,32,27,.38); backdrop-filter: blur(5px); }
@@ -1815,7 +1847,8 @@ button:focus-visible, input:focus-visible { outline-color: rgba(255,95,0,.36); o
 
 /* Final typography and compact-header fixes. */
 :root {
-  --ui-font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* Apple's native system face, with graceful fallbacks outside macOS/iOS. */
+  --ui-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --code-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
@@ -1842,6 +1875,40 @@ h1, .page-intro h1, .page-title-row h1 {
 .intro-copy, .page-title-row p { line-height: 1.6; }
 .topbar-actions, .live-status, .feedback-chip { min-width: 0; }
 .live-status, .feedback-chip { white-space: nowrap; }
+
+/* Give the footer enough breathing room so its brand, context, and version
+   read as separate pieces instead of one cramped strip. */
+.app-footer {
+  width: calc(100% - 76px);
+  max-width: 1524px;
+  min-height: 88px;
+  margin: 35px auto 0;
+  padding: 28px 0 24px;
+  column-gap: 28px;
+  row-gap: 12px;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.footer-brand > div { gap: 6px; }
+.footer-brand strong {
+  font-family: var(--ui-font);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: .02em;
+}
+.footer-brand span:not(.footer-circles) { font-size: 9px; line-height: 1.55; }
+.evidence-grid-single { grid-template-columns: 1fr; }
+
+/* Keep the inspect/simulate controls together in the Threat Intelligence table. */
+.attack-table td:last-child {
+  white-space: nowrap;
+}
+.attack-table td:last-child .table-action {
+  display: inline-grid;
+  vertical-align: middle;
+}
+.attack-table td:last-child .table-action + .table-action { margin-left: 6px; }
 
 .risk-gauge > div {
   width: 100%;
@@ -1969,7 +2036,8 @@ h1, .page-intro h1, .page-title-row h1 {
     padding: 0;
   }
   .attack-table td:nth-child(4) { display: none; }
-  .attack-table td:last-child { display: flex; gap: 5px; }
+  .attack-table td:last-child { display: flex; gap: 6px; }
+  .attack-table td:last-child .table-action + .table-action { margin-left: 0; }
   .attack-name { max-width: none; font-size: 12px; }
   .family-tag { margin-top: 3px; }
   .detection-meter { margin-top: 3px; }
@@ -1981,11 +2049,23 @@ h1, .page-intro h1, .page-title-row h1 {
   .evaluation-head { flex-direction: column; gap: 14px; }
   .evaluation-badges { width: 100%; }
   .evaluation-badges span { flex: 1; }
+  .evaluation-controls { grid-template-columns: 1fr auto; gap: 8px 12px; padding: 0 6px 14px; }
+  .evaluation-controls input { grid-column: 1 / -1; grid-row: 2; }
+  .evaluation-controls > span { justify-self: end; }
   .evaluation-panel canvas, #evaluation-curves {
     width: 100%;
     min-width: 0;
     height: 430px;
   }
+
+  .app-footer {
+    width: calc(100% - 24px);
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    padding: 26px 0 28px;
+  }
+  .footer-brand { min-width: 0; }
 
   .robustness-heatmap { grid-template-columns: 100px repeat(4, minmax(58px, 1fr)); padding: 0 12px; overflow-x: auto; }
   .heatmap-cell { min-height: 58px; }

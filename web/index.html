@@ -119,29 +119,6 @@
           </div>
         </div>
 
-        <div class="overview-secondary-grid">
-          <div class="surface timeline-surface">
-            <div class="surface-head"><div><span class="surface-kicker">THREAT TIMELINE</span><h3>From signal to action</h3></div><span class="chart-note">illustrative demo flow</span></div>
-            <div class="threat-timeline" aria-label="Threat detection timeline">
-              <div class="timeline-item"><span class="timeline-time">09:42:11</span><span class="timeline-node red-node"></span><div><strong>Suspicious event detected</strong><small>New payee + network signal crossed the review threshold.</small></div></div>
-              <div class="timeline-item"><span class="timeline-time">09:42:13</span><span class="timeline-node amber-node"></span><div><strong>Behavioral anomaly identified</strong><small>Session pattern deviates from the customer's baseline.</small></div></div>
-              <div class="timeline-item"><span class="timeline-time">09:42:15</span><span class="timeline-node blue-node"></span><div><strong>Risk score increased</strong><small>Explainable factors are assembled for analyst review.</small></div></div>
-              <div class="timeline-item"><span class="timeline-time">09:42:17</span><span class="timeline-node red-node"></span><div><strong>Transaction flagged</strong><small>Policy recommends step-up verification or decline.</small></div></div>
-              <div class="timeline-item"><span class="timeline-time">09:42:20</span><span class="timeline-node green-node"></span><div><strong>Analyst action requested</strong><small>Feedback can be promoted into the next model cycle.</small></div></div>
-            </div>
-          </div>
-          <div class="surface system-surface">
-            <div class="surface-head"><div><span class="surface-kicker">SYSTEM STATUS</span><h3>Pipeline health</h3></div><span class="status-badge operational"><span class="status-dot"></span> OPERATIONAL</span></div>
-            <div class="system-status-list">
-              <div><span><i data-lucide="radio"></i> Event stream</span><strong>ONLINE</strong></div>
-              <div><span><i data-lucide="brain-circuit"></i> Risk engine</span><strong>ONLINE</strong></div>
-              <div><span><i data-lucide="scan-line"></i> Detection layer</span><strong>ONLINE</strong></div>
-              <div><span><i data-lucide="refresh-cw"></i> Feedback loop</span><strong id="system-feedback-status">ARMED</strong></div>
-            </div>
-            <div class="system-note"><span class="status-dot"></span><span>Demo environment — simulated transaction data</span></div>
-          </div>
-        </div>
-
         <div class="lower-grid">
           <div class="surface stream-surface">
             <div class="surface-head"><div><span class="surface-kicker">LIVE ACTIVITY FEED</span><h3>Recent security events</h3></div><button class="text-button" data-view="defense">Open risk engine <i data-lucide="arrow-up-right"></i></button></div>
@@ -191,10 +168,9 @@
       </section>
 
       <section class="view" id="view-evidence">
-        <div class="page-title-row"><div><div class="eyebrow"><span class="eyebrow-line"></span> VALIDATE / READINESS</div><h1>Validation and readiness.</h1><p>See what is measured in the prototype and what a production pilot still needs.</p></div><div class="title-stat accent"><span>PROJECT ARTIFACTS</span><strong>04</strong><small>code / model / UX / runbook</small></div></div>
-        <div class="evaluation-panel"><div class="evaluation-head"><div><span class="surface-kicker">MODEL EVALUATION / SYNTHETIC HOLDOUT</span><h3>Detection curves and operating point</h3><p>Curves are derived from the generated holdout score bins; they are evaluation evidence, not production claims.</p></div><div class="evaluation-badges"><span><b id="evaluation-auc">--</b> ROC AUC</span><span><b id="evaluation-pr-auc">--</b> PR AUC</span></div></div><canvas id="evaluation-curves" width="900" height="250" aria-label="ROC and precision-recall curves derived from synthetic holdout bins" role="img"></canvas></div>
-        <div class="evidence-grid"><div class="surface evidence-principles"><div class="surface-head"><div><span class="surface-kicker">VALIDATION BASIS</span><h3>What this prototype demonstrates</h3></div></div><div class="principle-row"><div class="principle-index">01</div><div><strong>Broad attack coverage</strong><span>24 hypotheses cover cards, instant payments, wallets, merchants, refunds, identity, and social engineering.</span></div></div><div class="principle-row"><div class="principle-index">02</div><div><strong>Correlated simulation</strong><span>Scenario recipes move transaction, device, graph, session, and content signals together.</span></div></div><div class="principle-row"><div class="principle-index">03</div><div><strong>Closed-loop learning</strong><span>Hard cases can be promoted into the next cycle while evaluation data stays separate.</span></div></div></div><div class="surface artifact-list"><div class="surface-head"><div><span class="surface-kicker">PROJECT ARTIFACTS</span><h3>Available in this repo</h3></div></div><div class="artifact-item"><span class="artifact-icon red-bg"><i data-lucide="play-circle"></i></span><div><strong>Runnable prototype</strong><small>app.py + web/</small></div><span class="artifact-ok">READY</span></div><div class="artifact-item"><span class="artifact-icon amber-bg"><i data-lucide="scan-search"></i></span><div><strong>Attack catalog</strong><small>24 scenarios / taxonomy.py</small></div><span class="artifact-ok">READY</span></div><div class="artifact-item"><span class="artifact-icon teal-bg"><i data-lucide="line-chart"></i></span><div><strong>Model and tests</strong><small>model.py + tests/</small></div><span class="artifact-ok">READY</span></div><div class="artifact-item"><span class="artifact-icon violet-bg"><i data-lucide="book-open"></i></span><div><strong>Runbook and architecture</strong><small>docs/</small></div><span class="artifact-ok">READY</span></div></div></div>
-        <div class="surface runbook-surface"><div class="surface-head"><div><span class="surface-kicker">PRODUCTION PATH</span><h3>What changes when real payment events arrive</h3></div></div><div class="runbook"><div><span class="runbook-number">01</span><strong>Stream</strong><small>ISO 8583 / ISO 20022 / wallet events</small></div><div><span class="runbook-number">02</span><strong>Enrich</strong><small>device, identity, graph, and content signals</small></div><div><span class="runbook-number">03</span><strong>Decide</strong><small>approve, step up, hold, or decline with reason codes</small></div><div><span class="runbook-number">04</span><strong>Learn</strong><small>confirmed outcomes plus red-team misses</small></div></div></div>
+        <div class="page-title-row"><div><div class="eyebrow"><span class="eyebrow-line"></span> VALIDATE / READINESS</div><h1>Validation and readiness.</h1><p>See what is measured in the prototype and what a production pilot still needs.</p></div><div class="title-stat accent"><span>HOLDOUT STATUS</span><strong>READY</strong><small>synthetic evidence</small></div></div>
+        <div class="evaluation-panel"><div class="evaluation-head"><div><span class="surface-kicker">MODEL EVALUATION / SYNTHETIC HOLDOUT</span><h3>Detection curves and operating point</h3><p>Curves are derived from the generated holdout score bins; they are evaluation evidence, not production claims.</p></div><div class="evaluation-badges"><span><b id="evaluation-auc">--</b> ROC AUC</span><span><b id="evaluation-pr-auc">--</b> PR AUC</span></div></div><div class="evaluation-controls"><label for="evaluation-threshold">OPERATING THRESHOLD <output id="evaluation-threshold-value" for="evaluation-threshold">--</output></label><input id="evaluation-threshold" type="range" min="0" max="1" step="0.01" value="0.50" aria-label="Change evaluation operating threshold"><span id="evaluation-operating-point">-- recall · -- FPR</span></div><canvas id="evaluation-curves" width="900" height="250" aria-label="ROC and precision-recall curves derived from synthetic holdout bins" role="img"></canvas></div>
+        <div class="evidence-grid evidence-grid-single"><div class="surface evidence-principles"><div class="surface-head"><div><span class="surface-kicker">VALIDATION BASIS</span><h3>What this prototype demonstrates</h3></div></div><div class="principle-row"><div class="principle-index">01</div><div><strong>Broad attack coverage</strong><span>24 hypotheses cover cards, instant payments, wallets, merchants, refunds, identity, and social engineering.</span></div></div><div class="principle-row"><div class="principle-index">02</div><div><strong>Correlated simulation</strong><span>Scenario recipes move transaction, device, graph, session, and content signals together.</span></div></div><div class="principle-row"><div class="principle-index">03</div><div><strong>Closed-loop learning</strong><span>Hard cases can be promoted into the next cycle while evaluation data stays separate.</span></div></div></div></div>
       </section>
 
       <section class="view" id="view-fidelity">
@@ -216,6 +192,10 @@
   <dialog class="detail-dialog" id="attack-dialog" aria-labelledby="attack-dialog-title">
     <div class="dialog-head"><div><span class="surface-kicker">ATTACK INTELLIGENCE</span><h2 id="attack-dialog-title">Scenario</h2></div><button class="icon-button quiet" data-dialog-close="attack-dialog" aria-label="Close scenario" title="Close scenario"><i data-lucide="x"></i></button></div>
     <div class="dialog-body" id="attack-dialog-content"></div>
+  </dialog>
+  <dialog class="detail-dialog queue-dialog" id="queue-dialog" aria-labelledby="queue-dialog-title">
+    <div class="dialog-head"><div><span class="surface-kicker">FEEDBACK QUEUE</span><h2 id="queue-dialog-title">Queued hard cases</h2></div><button class="icon-button quiet" data-dialog-close="queue-dialog" aria-label="Close feedback queue" title="Close feedback queue"><i data-lucide="x"></i></button></div>
+    <div class="dialog-body" id="queue-dialog-content"></div>
   </dialog>
   <dialog class="command-palette" id="command-palette" aria-labelledby="command-palette-title">
     <div class="command-head"><div><span class="surface-kicker">QUICK NAVIGATION</span><h2 id="command-palette-title">Command palette</h2></div><button class="icon-button quiet" data-dialog-close="command-palette" aria-label="Close command palette"><i data-lucide="x"></i></button></div>
