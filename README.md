@@ -1,15 +1,12 @@
 <div align="center">
 
-# MasterShield AI
+# MasterShield
 
 ### Identify. Generate. Defend.
 
 An explainable security research platform for evaluating AI-enabled payment fraud defenses.
 
 </div>
-
-> [!IMPORTANT]
-> MasterShield is a synthetic research prototype. It generates transactions, attack scenarios, and evaluation metrics locally. It does not connect to payment networks, process real customer data, or represent production performance.
 
 ## Overview
 
@@ -78,14 +75,6 @@ To use a different interface or port:
 
 ```bash
 python3 app.py --host 0.0.0.0 --port 9000
-```
-
-### Enable SQLite persistence
-
-By default, runtime events are held in memory. Set `MASTERSHIELD_DB` to persist feedback, simulations, audit events, and model metadata:
-
-```bash
-MASTERSHIELD_DB=work/mastershield.db python3 app.py
 ```
 
 ## Common Commands
@@ -193,13 +182,3 @@ python3 -m unittest discover -s tests -v
 ```
 
 The tests cover attack-catalog integrity, deterministic generation, schema validation, scoring, feedback, retraining, holdout isolation, model rollback, fidelity, persistence, and HTTP/WSGI behavior.
-
-## Deployment
-
-The repository includes a Vercel configuration that deploys `app.py` as a Python WSGI application and bundles the `sentinel/` and `web/` directories. For local or self-hosted use, run the built-in threaded HTTP server directly.
-
-## Safety and Scope
-
-MasterShield operates exclusively on synthetic payment-shaped data. The adaptive testing component changes bounded numeric and categorical transaction features; it does not generate phishing content, credentials, target lists, evasion procedures, or instructions for interacting with real payment systems.
-
-Before production use, the prototype would require substantial additional engineering, including authenticated and authorized access, tokenized event ingestion, durable managed storage, secrets management, encryption controls, signed model artifacts, observability, privacy review, confirmed fraud labels, operational runbooks, and independent security validation.
