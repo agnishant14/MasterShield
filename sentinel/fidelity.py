@@ -157,6 +157,18 @@ def robustness_report(detector, generator, seed: int = 2026, sample_size: int = 
         detected = sum(detector.predict(row) for row in positives)
         return {"rows": len(rows), "attack_rows": len(positives), "attack_recall": round(detected / max(1, len(positives)), 4), "mean_risk": round(_mean([detector.score(row) for row in rows]), 4)}
 
+    intensity_levels = (0.55, 0.82, 1.08, 1.32)
+    robustness_grid = {}
+    for label, attack_ids in (("known_attack", ["atk-001", "atk-005", "atk-008"]), ("unknown_attack", ["atk-020", "atk-021", "atk-024"])):
+        robustness_grid[label] = [capture(generator.generate_attacks(sample_size, attack_ids, intensity=intensity)) for intensity in intensity_levels]
+    missing_grid = []
+    for intensity in intensity_levels:
+        rows = generator.generate_mixed(sample_size, attack_rate=0.35, intensity=intensity)
+        for row in rows:
+            for key in ("ip_risk", "merchant_risk", "session_entropy", "prompt_pressure_score"):
+                row.pop(key, None)
+        missing_grid.append(capture(rows))
+
     mutation_source = unseen[:24]
     attacker = AdaptiveAttacker(seed + 91)
     candidates = []
@@ -189,4 +201,10 @@ def robustness_report(detector, generator, seed: int = 2026, sample_size: int = 
         "missing_features": capture(noisy),
         "legitimate_baseline": capture(normal),
         "adversarial": adversarial,
+        "robustness_grid": {
+            **robustness_grid,
+            "missing_features": missing_grid,
+            "behavior_drift": [capture(generator.generate_attacks(sample_size, ["atk-013", "atk-019"], intensity=intensity)) for intensity in intensity_levels],
+            "noise": [capture(generator.generate_mixed(sample_size, attack_rate=0.25, intensity=intensity)) for intensity in intensity_levels],
+        },
     }

@@ -54,7 +54,10 @@ class EventStore:
 
     def list(self, kind: str, limit: int = 100) -> list[dict]:
         with self.lock:
+            bounded = max(0, min(int(limit), 500))
+            if bounded == 0:
+                return []
             if self.connection:
-                rows = self.connection.execute("SELECT payload, created_at FROM events WHERE kind = ? ORDER BY id DESC LIMIT ?", (kind, max(1, min(int(limit), 500)))).fetchall()
+                rows = self.connection.execute("SELECT payload, created_at FROM events WHERE kind = ? ORDER BY id DESC LIMIT ?", (kind, bounded)).fetchall()
                 return [{"kind": kind, "payload": json.loads(payload), "created_at": created_at} for payload, created_at in rows]
-            return list(reversed(self.memory.get(kind, [])[-max(1, min(int(limit), 500)):]))
+            return list(reversed(self.memory.get(kind, [])[-bounded:]))
