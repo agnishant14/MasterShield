@@ -2220,3 +2220,173 @@ th {
   .app-footer,
   .footer-brand span:not(.footer-circles) { font-size: 10px; }
 }
+
+/* Unified product typography: native SF Pro on Apple devices and the closest
+   platform system face elsewhere. Metrics stay aligned without making the
+   interface read like a terminal. */
+:root {
+  --ui-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --code-font: var(--ui-font);
+}
+
+html,
+body,
+button,
+input,
+textarea,
+select,
+dialog,
+table,
+th,
+td,
+kbd,
+code,
+.mono,
+.tx-main,
+.model-name,
+.model-chip strong,
+.model-meta,
+.run-id,
+.step-stat,
+.kpi-value,
+.breadcrumbs,
+.live-status small,
+.timeline-time,
+.system-status-list strong,
+.risk-gauge strong,
+.risk-gauge span,
+.investigation-score strong,
+.investigation-score span,
+.investigation-status,
+.investigation-hero p,
+.action-center button,
+.network-live,
+.network-node strong,
+.network-node small,
+.network-caption,
+.network-legend,
+.landscape-rank,
+.landscape-row b,
+.pipeline-stage > span,
+.risk-engine-pipeline > div > span,
+.simulation-comparison span,
+.simulation-comparison strong,
+.comparison-factors span,
+.comparison-factors b,
+.heatmap-corner,
+.heatmap-heading,
+.heatmap-row-label,
+.heatmap-cell strong,
+.heatmap-detail b,
+.attack-bubble small,
+.evaluation-badges span,
+.evaluation-badges b,
+.search-trigger,
+.search-trigger kbd,
+.command-list kbd,
+.command-result-label,
+.command-result-group button b,
+.footer-brand strong,
+.evidence-source-badge,
+.external-evidence-metric strong,
+.external-evidence-period,
+.external-evidence-row > a,
+.external-evidence-foot .mono,
+.queue-summary strong,
+.queue-item-head strong,
+.queue-item-meta b {
+  font-family: var(--ui-font);
+  letter-spacing: 0;
+}
+
+body {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select { font-weight: 500; }
+
+h1,
+h2,
+h3,
+h4,
+.brand-name,
+.section-head h2,
+.surface-head h3,
+.page-title-row h1,
+.page-intro h1 {
+  font-family: var(--ui-font);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.mono,
+.tx-main,
+.model-name,
+.model-chip strong,
+.model-meta,
+.run-id,
+.step-stat,
+.kpi-value,
+.metric-panel strong,
+.title-stat strong,
+.result-kpis strong,
+.sample-risk,
+.risk-gauge strong,
+.investigation-score strong,
+.simulation-comparison strong,
+.heatmap-cell strong,
+.evaluation-badges b,
+.external-evidence-metric strong,
+.queue-summary strong,
+.queue-item-meta b {
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow,
+.surface-kicker,
+.kpi-label,
+.foot-label,
+.field-block label,
+.metric-panel > span,
+.evaluation-controls label,
+th,
+.builder-status,
+.cycle-badge,
+.calibration-chip,
+.status-badge,
+.network-live {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.nav-item,
+.primary-button,
+.secondary-button,
+.secondary-action,
+.danger-action,
+.filter-button,
+.segmented button,
+.table-action,
+.text-button,
+.search-trigger,
+.command-list button {
+  font-family: var(--ui-font);
+  font-weight: 550;
+  letter-spacing: 0;
+}
+
+@media (max-width: 760px) {
+  .sidebar .nav-item span {
+    font-family: var(--ui-font);
+    font-weight: 550;
+    letter-spacing: 0;
+  }
+}
