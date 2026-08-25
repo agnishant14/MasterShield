@@ -301,6 +301,12 @@ function renderBreadcrumb(viewName) {
   $("#crumb-view").textContent = (compact ? navLabel.split(" ").at(-1) : navLabel).toUpperCase();
 }
 
+function revealActiveView(viewName) {
+  const activeView = $(`#view-${viewName}`);
+  if (!activeView) return;
+  $$('[data-reveal="pending"]', activeView).forEach((node) => { node.dataset.reveal = "visible"; });
+}
+
 function switchView(viewName) {
   const previousView = document.body.dataset.view;
   document.body.dataset.view = viewName;
@@ -312,6 +318,7 @@ function switchView(viewName) {
     else item.removeAttribute("aria-current");
   });
   renderBreadcrumb(viewName);
+  revealActiveView(viewName);
   if (previousView !== viewName) window.scrollTo({ top: 0, behavior: "smooth" });
   if (viewName === "attacks") renderAttackTable();
   if (viewName === "simulate") renderScenarioPicker();
@@ -680,8 +687,11 @@ function drawEvaluationCurves(data) {
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
   const ratio = Math.max(1, window.devicePixelRatio || 1);
-  const width = Math.max(420, Math.floor((rect.width || 900) * ratio));
-  const height = Math.floor(250 * ratio);
+  const cssWidth = Math.max(280, Math.floor(rect.width || 900));
+  const compact = cssWidth < 560;
+  const cssHeight = compact ? 430 : 250;
+  const width = Math.floor(cssWidth * ratio);
+  const height = Math.floor(cssHeight * ratio);
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
@@ -691,9 +701,10 @@ function drawEvaluationCurves(data) {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
-  const pad = { left: 42, right: 28, top: 23, bottom: 32 };
-  const graphW = (w - pad.left - pad.right) / 2 - 22;
-  const graphH = h - pad.top - pad.bottom;
+  const pad = { left: 42, right: 22, top: 28, bottom: 32 };
+  const graphGap = compact ? 54 : 44;
+  const graphW = compact ? w - pad.left - pad.right : (w - pad.left - pad.right - graphGap) / 2;
+  const graphH = compact ? (h - pad.top - pad.bottom - graphGap) / 2 : h - pad.top - pad.bottom;
   const dist = data?.validation?.risk_distribution || {};
   const legitimate = Array.isArray(dist.legitimate) ? dist.legitimate : [];
   const attacks = Array.isArray(dist.attack) ? dist.attack : [];
@@ -712,14 +723,14 @@ function drawEvaluationCurves(data) {
     const fp = (legitimate[legitimate.length - index - 1] || 0) + (index ? fpr[index - 1] * totalNormal : 0);
     return [Math.min(1, tp / Math.max(1, tp + fp)), tpr[index] ?? 0];
   })];
-  const drawGraph = (originX, title, xLabel, yLabel, curve, color) => {
+  const drawGraph = (originX, originY, title, xLabel, yLabel, curve, color) => {
     ctx.strokeStyle = "rgba(117,98,82,.16)"; ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i += 1) { const y = pad.top + graphH * i / 4; ctx.beginPath(); ctx.moveTo(originX, y); ctx.lineTo(originX + graphW, y); ctx.stroke(); const x = originX + graphW * i / 4; ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + graphH); ctx.stroke(); }
-    ctx.fillStyle = "#3e3935"; ctx.font = "600 9px ui-monospace, monospace"; ctx.fillText(title, originX, 14); ctx.fillStyle = "#7b726b"; ctx.font = "500 8px ui-monospace, monospace"; ctx.fillText(xLabel, originX + graphW - 58, h - 8); ctx.save(); ctx.translate(originX - 28, pad.top + graphH / 2 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, 0, 0); ctx.restore();
-    ctx.save(); ctx.beginPath(); curve.forEach(([x, y], index) => { const px = originX + x * graphW; const py = pad.top + (1 - y) * graphH; index ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
+    for (let i = 0; i <= 4; i += 1) { const y = originY + graphH * i / 4; ctx.beginPath(); ctx.moveTo(originX, y); ctx.lineTo(originX + graphW, y); ctx.stroke(); const x = originX + graphW * i / 4; ctx.beginPath(); ctx.moveTo(x, originY); ctx.lineTo(x, originY + graphH); ctx.stroke(); }
+    ctx.fillStyle = "#3e3935"; ctx.font = "600 9px ui-monospace, monospace"; ctx.fillText(title, originX, originY - 9); ctx.fillStyle = "#7b726b"; ctx.font = "500 8px ui-monospace, monospace"; ctx.fillText(xLabel, Math.max(originX, originX + graphW - 62), originY + graphH + 20); ctx.save(); ctx.translate(originX - 28, originY + graphH / 2 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, 0, 0); ctx.restore();
+    ctx.save(); ctx.beginPath(); curve.forEach(([x, y], index) => { const px = originX + x * graphW; const py = originY + (1 - y) * graphH; index ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
   };
-  drawGraph(pad.left, "ROC CURVE", "false positive rate", "true positive rate", rocPoints, "#ff5f00");
-  drawGraph(pad.left + graphW + 44, "PRECISION / RECALL", "recall", "precision", precisionRecall.map(([precision, recall]) => [recall, precision]), "#f79e1b");
+  drawGraph(pad.left, pad.top, "ROC CURVE", "false positive rate", "true positive rate", rocPoints, "#ff5f00");
+  drawGraph(compact ? pad.left : pad.left + graphW + graphGap, compact ? pad.top + graphH + graphGap : pad.top, "PRECISION / RECALL", "recall", "precision", precisionRecall.map(([precision, recall]) => [recall, precision]), "#f79e1b");
   $("#evaluation-auc") && ($("#evaluation-auc").textContent = Number(data?.metrics?.auc || 0).toFixed(3));
   $("#evaluation-pr-auc") && ($("#evaluation-pr-auc").textContent = Number(data?.metrics?.pr_auc || 0).toFixed(3));
 }
@@ -1203,6 +1214,7 @@ function bindEvents() {
 document.addEventListener("DOMContentLoaded", () => {
   document.body.dataset.view = "overview";
   renderBreadcrumb("overview");
+  revealActiveView("overview");
   refreshIcons();
   bindRevealMotion();
   bindEvents();

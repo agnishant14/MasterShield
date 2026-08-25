@@ -1843,6 +1843,33 @@ h1, .page-intro h1, .page-title-row h1 {
 .topbar-actions, .live-status, .feedback-chip { min-width: 0; }
 .live-status, .feedback-chip { white-space: nowrap; }
 
+.risk-gauge > div {
+  width: 100%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  text-align: center;
+}
+.risk-gauge strong {
+  display: block;
+  max-width: 100%;
+  font-family: var(--code-font);
+  font-size: 36px;
+  font-weight: 500;
+  line-height: .95;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.risk-gauge span {
+  display: block;
+  font-family: var(--ui-font);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
 @media (max-width: 760px) {
   .breadcrumbs { min-width: 0; }
   .breadcrumbs strong {
@@ -1855,4 +1882,112 @@ h1, .page-intro h1, .page-title-row h1 {
   }
   .topbar-actions { gap: 7px; }
   .live-status { padding-right: 7px; font-size: 10px; }
+
+  /* Keep the fixed phone navigation balanced beneath each icon. */
+  .sidebar .nav-list {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    align-items: stretch;
+    justify-items: stretch;
+  }
+  .sidebar .nav-item {
+    min-width: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 2px 3px;
+    text-align: center;
+    line-height: 1.05;
+  }
+  .sidebar .nav-item span {
+    display: block;
+    width: 100%;
+    max-width: 58px;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+  .sidebar .nav-item svg { flex: 0 0 auto; }
+
+  .view { padding-bottom: 92px; }
+  .page-title-row { gap: 18px; }
+  .page-title-row h1 { font-size: 30px; line-height: 1.05; }
+  .page-title-row p { margin-top: 13px; font-size: 13px; }
+  .title-stat { width: 100%; min-width: 0; padding: 20px; }
+
+  .risk-score-layout { gap: 18px; padding: 22px 16px; }
+  .risk-gauge { width: 132px; height: 132px; }
+  .risk-summary > strong { font-size: 17px; }
+  .risk-summary p { font-size: 11px; }
+
+  .network-panel-head, .simulation-story-head, .risk-engine-head,
+  .fidelity-hero-head, .attack-landscape-head, .evaluation-head {
+    padding: 18px 16px 14px;
+  }
+  .threat-network { min-height: 340px; }
+  .network-node { width: 78px; min-height: 48px; padding: 6px 5px; border-radius: 11px; }
+  .node-orbit { inset: -6px; }
+  .network-node strong { font-size: 7px; }
+  .network-node small { font-size: 8px; }
+  .network-caption { left: 12px; right: 12px; bottom: 10px; font-size: 8px; }
+  .network-legend { gap: 10px; padding: 10px 14px; font-size: 8px; }
+
+  .stream-surface table, .attack-table table,
+  .stream-surface thead, .attack-table thead,
+  .stream-surface tbody, .attack-table tbody,
+  .stream-surface tr, .attack-table tr,
+  .stream-surface td, .attack-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .stream-surface thead, .attack-table thead { display: none; }
+  .stream-surface tbody, .attack-table tbody { padding: 10px; }
+  .stream-surface tr, .attack-table tr {
+    position: relative;
+    margin-bottom: 10px;
+    padding: 14px;
+    border: 1px solid var(--ms-line);
+    border-radius: 14px;
+    background: #fff;
+  }
+  .stream-surface tr:last-child, .attack-table tr:last-child { margin-bottom: 0; }
+  .stream-surface td, .attack-table td {
+    height: auto;
+    padding: 4px 0;
+    border: 0;
+    white-space: normal;
+  }
+  .stream-surface td:first-child, .attack-table td:first-child { padding-right: 74px; }
+  .stream-surface td:last-child, .attack-table td:last-child {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: auto;
+    padding: 0;
+  }
+  .attack-table td:nth-child(4) { display: none; }
+  .attack-table td:last-child { display: flex; gap: 5px; }
+  .attack-name { max-width: none; font-size: 12px; }
+  .family-tag { margin-top: 3px; }
+  .detection-meter { margin-top: 3px; }
+  .stream-surface .risk-cell { margin-top: 3px; }
+  .stream-surface .decision { margin-top: 3px; }
+  .table-wrap, .attack-table { overflow: visible; }
+
+  .evaluation-panel { padding: 0 10px 14px; overflow: hidden; }
+  .evaluation-head { flex-direction: column; gap: 14px; }
+  .evaluation-badges { width: 100%; }
+  .evaluation-badges span { flex: 1; }
+  .evaluation-panel canvas, #evaluation-curves {
+    width: 100%;
+    min-width: 0;
+    height: 430px;
+  }
+
+  .robustness-heatmap { grid-template-columns: 100px repeat(4, minmax(58px, 1fr)); padding: 0 12px; overflow-x: auto; }
+  .heatmap-cell { min-height: 58px; }
+  .heatmap-detail { align-items: flex-start; flex-direction: column; margin: 14px 12px 0; }
 }
