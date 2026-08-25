@@ -251,16 +251,53 @@ function openCommandPalette() {
   const palette = $("#command-palette");
   if (!palette) return;
   palette.showModal();
+  const search = $("#command-search");
+  if (search) search.value = "";
+  renderCommandResults("");
+  $$('[data-command-view]', $("#command-list")).forEach((item) => { item.hidden = false; });
   requestAnimationFrame(() => $("#command-search")?.focus());
+}
+
+function renderCommandResults(query) {
+  const target = $("#command-results");
+  if (!target) return;
+  const normalized = String(query || "").trim().toLowerCase();
+  if (!normalized) {
+    target.hidden = true;
+    target.innerHTML = "";
+    return;
+  }
+  const transactions = [...state.transactionIndex.values()].filter((row) => {
+    const haystack = [row.id, row.customer_id, row.merchant_id, row.device_id, row.country, row.rail, row.channel, row.attack_name, row.decision].join(" ").toLowerCase();
+    return haystack.includes(normalized);
+  }).slice(0, 5);
+  const threats = (Array.isArray(state.attacks) ? state.attacks : []).filter((attack) => {
+    const haystack = [attack.id, attack.name, attack.family, attack.rail, attack.channel, attack.severity, attack.genai_role].join(" ").toLowerCase();
+    return haystack.includes(normalized);
+  }).slice(0, 5);
+  const resultCount = transactions.length + threats.length;
+  target.hidden = false;
+  target.innerHTML = resultCount ? `${transactions.length ? `<div class="command-result-group"><span class="command-result-label">TRANSACTIONS / ENTITIES</span>${transactions.map((row) => `<button type="button" data-command-transaction="${escapeHTML(row.id)}"><i data-lucide="scan-eye"></i><span><strong>${escapeHTML(row.id)}</strong><small>${escapeHTML(row.attack_name || "legitimate baseline")} · ${escapeHTML(row.customer_id || "customer")}</small></span><b>${escapeHTML(String(row.decision || "review").toUpperCase())}</b></button>`).join("")}</div>` : ""}${threats.length ? `<div class="command-result-group"><span class="command-result-label">THREAT SCENARIOS</span>${threats.map((attack) => `<button type="button" data-command-attack="${escapeHTML(attack.id)}"><i data-lucide="scan-search"></i><span><strong>${escapeHTML(attack.name)}</strong><small>${escapeHTML(attack.family || "scenario")} · ${escapeHTML(attack.severity || "synthetic")}</small></span><b>THREAT</b></button>`).join("")}</div>` : ""}` : `<div class="command-no-results">No matching synthetic transactions, entities, or threats.</div>`;
+  refreshIcons();
+  $$('[data-command-transaction]', target).forEach((button) => button.addEventListener("click", () => {
+    $("#command-palette")?.close();
+    openTransactionDialog(button.dataset.commandTransaction);
+  }));
+  $$('[data-command-attack]', target).forEach((button) => button.addEventListener("click", () => {
+    $("#command-palette")?.close();
+    openAttackDialog(button.dataset.commandAttack);
+  }));
 }
 
 function bindCommandPalette() {
   $("#command-trigger")?.addEventListener("click", openCommandPalette);
+  $("#search-trigger")?.addEventListener("click", openCommandPalette);
   $("#command-search")?.addEventListener("input", (event) => {
     const query = event.target.value.trim().toLowerCase();
     $$("[data-command-view]", $("#command-list")).forEach((item) => {
       item.hidden = query && !item.textContent.toLowerCase().includes(query);
     });
+    renderCommandResults(query);
   });
   $$('[data-command-view]').forEach((button) => button.addEventListener("click", () => {
     $("#command-palette")?.close();
@@ -371,12 +408,48 @@ function renderThreatNetwork(rows) {
     { key: "risk", label: "RISK EVENT", value: `${Math.round(Number(row.risk_score || 0) * 100)} / ${String(row.decision || "review").toUpperCase()}`, x: 91, y: 50, tone: "critical" },
   ];
   const edges = [[0,1],[1,2],[1,3],[2,4],[3,5],[4,6],[5,6]];
-  const svg = `<svg class="network-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="network-gradient" x1="0" x2="1"><stop stop-color="#f04438"/><stop offset=".5" stop-color="#f59e0b"/><stop offset="1" stop-color="#22d3ee"/></linearGradient><filter id="network-glow"><feGaussianBlur stdDeviation=".8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${edges.map(([from, to]) => `<line class="network-edge" x1="${entities[from].x}" y1="${entities[from].y}" x2="${entities[to].x}" y2="${entities[to].y}" />`).join("")}</svg>`;
-  target.innerHTML = `${svg}<div class="network-grid-lines"></div>${entities.map((item) => `<button class="network-node ${item.tone} ${item.tx ? "transaction-node" : ""}" style="left:${item.x}%;top:${item.y}%" data-network-node="${escapeHTML(item.key)}" ${item.tx ? `data-network-transaction="${escapeHTML(row.id)}"` : ""}><span class="node-orbit"></span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(item.value)}</small></button>`).join("")}<div class="network-caption"><span class="status-dot"></span> Trace selected high-risk event / ${escapeHTML(row.id)}</div>`;
-  $$('[data-network-node]', target).forEach((button) => button.addEventListener("click", () => {
-    if (button.dataset.networkTransaction) openTransactionDialog(button.dataset.networkTransaction);
-    else toast(`${button.querySelector("strong")?.textContent || "Entity"}: ${button.querySelector("small")?.textContent || "synthetic entity"}`);
-  }));
+  const svg = `<svg class="network-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="network-gradient" x1="0" x2="1"><stop stop-color="#eb001b"/><stop offset=".5" stop-color="#ff5f00"/><stop offset=".82" stop-color="#f79e1b"/><stop offset="1" stop-color="#78bfc3"/></linearGradient><filter id="network-glow"><feGaussianBlur stdDeviation=".8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${edges.map(([from, to]) => `<line class="network-edge" data-edge-from="${escapeHTML(entities[from].key)}" data-edge-to="${escapeHTML(entities[to].key)}" x1="${entities[from].x}" y1="${entities[from].y}" x2="${entities[to].x}" y2="${entities[to].y}" />`).join("")}</svg>`;
+  delete target.dataset.networkSelection;
+  target.classList.remove("network-focus");
+  target.innerHTML = `${svg}<div class="network-grid-lines"></div>${entities.map((item) => `<button class="network-node ${item.tone} ${item.tx ? "transaction-node" : ""}" style="left:${item.x}%;top:${item.y}%" data-network-node="${escapeHTML(item.key)}" aria-label="Inspect ${escapeHTML(item.label)} ${escapeHTML(item.value)}" ${item.tx ? `data-network-transaction="${escapeHTML(row.id)}"` : ""}><span class="node-orbit"></span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(item.value)}</small></button>`).join("")}<div class="network-caption"><span class="status-dot"></span> Trace selected high-risk event / ${escapeHTML(row.id)}</div>`;
+  const nodes = $$('[data-network-node]', target);
+  const edgesByNode = new Map(entities.map((item) => [item.key, new Set([item.key])]));
+  edges.forEach(([from, to]) => {
+    edgesByNode.get(entities[from].key).add(entities[to].key);
+    edgesByNode.get(entities[to].key).add(entities[from].key);
+  });
+  const focusNetworkNode = (key) => {
+    const connected = edgesByNode.get(key) || new Set([key]);
+    target.classList.add("network-focus");
+    nodes.forEach((node) => node.classList.toggle("network-connected", connected.has(node.dataset.networkNode)));
+    nodes.forEach((node) => node.classList.toggle("network-dimmed", !connected.has(node.dataset.networkNode)));
+    $$('[data-edge-from]', target).forEach((edge) => {
+      const active = edge.dataset.edgeFrom === key || edge.dataset.edgeTo === key;
+      edge.classList.toggle("network-connected", active);
+      edge.classList.toggle("network-dimmed", !active);
+    });
+  };
+  const clearNetworkFocus = () => {
+    if (target.dataset.networkSelection) {
+      focusNetworkNode(target.dataset.networkSelection);
+      return;
+    }
+    target.classList.remove("network-focus");
+    nodes.forEach((node) => node.classList.remove("network-connected", "network-dimmed"));
+    $$('[data-edge-from]', target).forEach((edge) => edge.classList.remove("network-connected", "network-dimmed"));
+  };
+  nodes.forEach((button) => {
+    button.addEventListener("mouseenter", () => focusNetworkNode(button.dataset.networkNode));
+    button.addEventListener("focus", () => focusNetworkNode(button.dataset.networkNode));
+    button.addEventListener("mouseleave", clearNetworkFocus);
+    button.addEventListener("blur", clearNetworkFocus);
+    button.addEventListener("click", () => {
+      target.dataset.networkSelection = button.dataset.networkNode;
+      nodes.forEach((node) => node.classList.toggle("network-selected", node === button));
+      focusNetworkNode(button.dataset.networkNode);
+      openTransactionDialog(button.dataset.networkTransaction || row.id);
+    });
+  });
 }
 
 function renderRobustnessHeatmap(data) {
@@ -477,7 +550,7 @@ function drawBoundaryChart(data) {
   const width = canvas.width / ratio;
   const height = canvas.height / ratio;
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = "#fbfaf7";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, width, height);
   const distribution = data.validation?.risk_distribution || {};
   const legitimate = Array.isArray(distribution.legitimate) ? distribution.legitimate : [];
@@ -489,7 +562,7 @@ function drawBoundaryChart(data) {
   const totals = [legitimate, attacks].map((values) => Math.max(1, values.reduce((sum, value) => sum + value, 0)));
   const rates = [legitimate.map((value) => value / totals[0]), attacks.map((value) => value / totals[1])];
   const maxRate = Math.max(0.05, ...rates[0], ...rates[1]) * 1.15;
-  ctx.strokeStyle = "#e5e2dc";
+  ctx.strokeStyle = "rgba(117,98,82,.16)";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i += 1) {
     const y = pad.top + chartHeight * (i / 4);
@@ -501,26 +574,26 @@ function drawBoundaryChart(data) {
     const x = pad.left + index * groupWidth + groupWidth * .16;
     const legitimateHeight = chartHeight * (rate / maxRate);
     const attackHeight = chartHeight * ((rates[1][index] || 0) / maxRate);
-    ctx.fillStyle = "rgba(22,135,127,.72)";
+    ctx.fillStyle = "rgba(247,158,27,.72)";
     ctx.fillRect(x, pad.top + chartHeight - legitimateHeight, barWidth, legitimateHeight);
-    ctx.fillStyle = "rgba(217,79,32,.78)";
+    ctx.fillStyle = "rgba(235,0,27,.82)";
     ctx.fillRect(x + barWidth + 2, pad.top + chartHeight - attackHeight, barWidth, attackHeight);
   });
   const threshold = boundedRatio(data.metrics?.threshold || .5);
   const thresholdX = pad.left + chartWidth * threshold;
   ctx.save();
   ctx.setLineDash([5, 5]);
-  ctx.strokeStyle = "#0b0b0b";
+  ctx.strokeStyle = "#ff5f00";
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.moveTo(thresholdX, pad.top);
   ctx.lineTo(thresholdX, pad.top + chartHeight);
   ctx.stroke();
   ctx.restore();
-  ctx.fillStyle = "#767773";
+  ctx.fillStyle = "#7b726b";
   ctx.font = '9px ui-monospace, monospace';
   for (let i = 0; i <= 5; i += 1) ctx.fillText((i / 5).toFixed(1), pad.left + chartWidth * (i / 5) - 7, height - 9);
-  ctx.fillStyle = "#0b0b0b";
+  ctx.fillStyle = "#8e4c28";
   ctx.fillText(`THRESHOLD ${threshold.toFixed(2)}`, Math.min(width - 96, thresholdX + 5), pad.top + 11);
 }
 
@@ -538,7 +611,7 @@ function drawEvaluationCurves(data) {
   const w = width / ratio;
   const h = height / ratio;
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = "#07111f";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
   const pad = { left: 42, right: 28, top: 23, bottom: 32 };
   const graphW = (w - pad.left - pad.right) / 2 - 22;
@@ -562,13 +635,13 @@ function drawEvaluationCurves(data) {
     return [Math.min(1, tp / Math.max(1, tp + fp)), tpr[index] ?? 0];
   })];
   const drawGraph = (originX, title, xLabel, yLabel, curve, color) => {
-    ctx.strokeStyle = "rgba(139,176,204,.18)"; ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(117,98,82,.16)"; ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i += 1) { const y = pad.top + graphH * i / 4; ctx.beginPath(); ctx.moveTo(originX, y); ctx.lineTo(originX + graphW, y); ctx.stroke(); const x = originX + graphW * i / 4; ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + graphH); ctx.stroke(); }
-    ctx.fillStyle = "#a7c4d8"; ctx.font = "600 9px ui-monospace, monospace"; ctx.fillText(title, originX, 14); ctx.fillStyle = "#6f91aa"; ctx.font = "500 8px ui-monospace, monospace"; ctx.fillText(xLabel, originX + graphW - 58, h - 8); ctx.save(); ctx.translate(originX - 28, pad.top + graphH / 2 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, 0, 0); ctx.restore();
+    ctx.fillStyle = "#3e3935"; ctx.font = "600 9px ui-monospace, monospace"; ctx.fillText(title, originX, 14); ctx.fillStyle = "#7b726b"; ctx.font = "500 8px ui-monospace, monospace"; ctx.fillText(xLabel, originX + graphW - 58, h - 8); ctx.save(); ctx.translate(originX - 28, pad.top + graphH / 2 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, 0, 0); ctx.restore();
     ctx.save(); ctx.beginPath(); curve.forEach(([x, y], index) => { const px = originX + x * graphW; const py = pad.top + (1 - y) * graphH; index ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
   };
-  drawGraph(pad.left, "ROC CURVE", "false positive rate", "true positive rate", rocPoints, "#22d3ee");
-  drawGraph(pad.left + graphW + 44, "PRECISION / RECALL", "recall", "precision", precisionRecall.map(([precision, recall]) => [recall, precision]), "#f59e0b");
+  drawGraph(pad.left, "ROC CURVE", "false positive rate", "true positive rate", rocPoints, "#ff5f00");
+  drawGraph(pad.left + graphW + 44, "PRECISION / RECALL", "recall", "precision", precisionRecall.map(([precision, recall]) => [recall, precision]), "#f79e1b");
   $("#evaluation-auc") && ($("#evaluation-auc").textContent = Number(data?.metrics?.auc || 0).toFixed(3));
   $("#evaluation-pr-auc") && ($("#evaluation-pr-auc").textContent = Number(data?.metrics?.pr_auc || 0).toFixed(3));
 }

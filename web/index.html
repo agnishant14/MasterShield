@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101112">
+  <meta name="theme-color" content="#F6F5F2">
   <title>MasterShield | Payment Defense Console</title>
   <link rel="icon" href="/favicon.ico" type="image/svg+xml">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -46,6 +46,7 @@
           <div class="live-status" id="connection-status" data-mode="loading"><span class="status-dot"></span><span id="connection-label">Connecting</span><small id="last-sync">checking health</small></div>
           <div class="model-chip"><span class="model-chip-label">MODEL</span><strong id="topbar-model">hybrid-logit-c02</strong></div>
           <div class="feedback-chip"><i data-lucide="inbox"></i><span id="topbar-feedback">0 queued</span></div>
+          <button class="search-trigger" id="search-trigger" title="Search transactions, entities, and threats" aria-label="Search transactions, entities, and threats"><i data-lucide="search"></i><span>Search</span><kbd>⌘ K</kbd></button>
           <button class="icon-button command-trigger" id="command-trigger" title="Open command palette" aria-label="Open command palette"><i data-lucide="command"></i></button>
         </div>
       </header>
@@ -58,16 +59,18 @@
             <p class="intro-copy">MasterShield connects payment, device, network, and behavioral signals into one explainable decision layer for the digital economy.</p>
             <div class="hero-actions"><button class="primary-button" data-view="simulate"><i data-lucide="play"></i> Run a judge demo</button><span class="hero-note"><span class="status-dot"></span> Synthetic transaction data</span></div>
           </div>
-          <div class="intro-side">
-            <div class="date-label">CURRENT MODEL</div>
-            <div class="model-name" id="intro-model">hybrid-logit-c02</div>
-            <div class="model-meta"><span class="live-pill"><span class="status-dot"></span><span id="model-status-label">LOADING</span></span><span id="intro-time">--</span></div>
-          </div>
-          <div class="intro-visual" aria-hidden="true">
-            <div class="intro-orbit orbit-one"></div>
-            <div class="intro-orbit orbit-two"></div>
-            <div class="intro-core"><i data-lucide="shield-check"></i><span>RISK<br>INTELLIGENCE</span></div>
-            <span class="intro-spark spark-one"></span><span class="intro-spark spark-two"></span><span class="intro-spark spark-three"></span>
+          <div class="intro-rail">
+            <div class="intro-side">
+              <div class="date-label">CURRENT MODEL</div>
+              <div class="model-name" id="intro-model">hybrid-logit-c02</div>
+              <div class="model-meta"><span class="live-pill"><span class="status-dot"></span><span id="model-status-label">LOADING</span></span><span id="intro-time">--</span></div>
+            </div>
+            <div class="intro-visual" aria-hidden="true">
+              <div class="intro-orbit orbit-one"></div>
+              <div class="intro-orbit orbit-two"></div>
+              <div class="intro-core"><i data-lucide="activity"></i><span>MODEL<br>ONLINE</span></div>
+              <span class="intro-spark spark-one"></span><span class="intro-spark spark-two"></span><span class="intro-spark spark-three"></span>
+            </div>
           </div>
         </div>
 
@@ -83,7 +86,7 @@
         <div class="command-center-grid">
           <div class="network-panel">
             <div class="network-panel-head"><div><span class="surface-kicker">LIVE THREAT NETWORK</span><h3>Trace the threat across the ecosystem</h3><p>Entities and relationships are derived from the current synthetic event stream.</p></div><span class="network-live"><span class="status-dot"></span> STREAMING</span></div>
-            <div class="threat-network" id="threat-network" role="img" aria-label="Synthetic threat network showing relationships between customers, devices, merchants, transactions, IPs, locations, and risk events"></div>
+            <div class="threat-network" id="threat-network" role="application" aria-label="Synthetic threat network showing relationships between customers, devices, merchants, IPs, locations, and risk events"></div>
             <div class="network-legend"><span><i class="legend-node normal"></i> entity</span><span><i class="legend-node signal"></i> signal</span><span><i class="legend-node critical"></i> high risk</span><span class="mono">synthetic data / 140 events</span></div>
           </div>
           <div class="command-center-rail">
@@ -202,7 +205,7 @@
         <div class="surface runbook-surface"><div class="surface-head"><div><span class="surface-kicker">ADAPTIVE RED TEAM</span><h3>Find a detector blind spot</h3></div><button class="primary-button small" id="run-mutation"><i data-lucide="wand-sparkles"></i> Mutate a synthetic attack</button></div><div id="mutation-result" class="empty-state"><strong>No mutation search yet.</strong><span>Run the adaptive composer to inspect the mutation path and lowest-risk synthetic candidates.</span></div></div>
       </section>
 
-      <footer class="app-footer"><span>MASTERSHIELD / INDEPENDENT CHALLENGE PROTOTYPE</span><span>Metrics are generated holdout evidence, not production claims.</span><span class="mono">v1.1.0</span></footer>
+      <footer class="app-footer"><div class="footer-brand"><span class="footer-circles" aria-hidden="true"><i></i><i></i></span><div><strong>MasterShield</strong><span>Built for the digital economy. Securing every connection.</span></div></div><span>INDEPENDENT CHALLENGE PROTOTYPE / SYNTHETIC EVIDENCE</span><span class="mono">v1.1.0</span></footer>
     </main>
   </div>
   <div class="toast" id="toast" role="status"></div>
@@ -216,12 +219,14 @@
   </dialog>
   <dialog class="command-palette" id="command-palette" aria-labelledby="command-palette-title">
     <div class="command-head"><div><span class="surface-kicker">QUICK NAVIGATION</span><h2 id="command-palette-title">Command palette</h2></div><button class="icon-button quiet" data-dialog-close="command-palette" aria-label="Close command palette"><i data-lucide="x"></i></button></div>
-    <div class="command-search"><i data-lucide="search"></i><input id="command-search" type="search" placeholder="Search a view or action…" aria-label="Search commands"></div>
+    <div class="command-search"><i data-lucide="search"></i><input id="command-search" type="search" placeholder="Search views, transactions, entities, or threats…" aria-label="Search views, transactions, entities, or threats"></div>
+    <div class="command-results" id="command-results" hidden></div>
     <div class="command-list" id="command-list">
       <button data-command-view="overview"><i data-lucide="layout-dashboard"></i><span><strong>Security overview</strong><small>See score, threats, and activity</small></span><kbd>⌘ 1</kbd></button>
       <button data-command-view="attacks"><i data-lucide="scan-search"></i><span><strong>Threat intelligence</strong><small>Browse attack hypotheses</small></span><kbd>⌘ 2</kbd></button>
       <button data-command-view="simulate"><i data-lucide="play"></i><span><strong>Run a simulation</strong><small>Generate a synthetic adversarial stream</small></span><kbd>⌘ 3</kbd></button>
       <button data-command-view="defense"><i data-lucide="shield-check"></i><span><strong>Open risk engine</strong><small>Inspect explanations and model quality</small></span><kbd>⌘ 4</kbd></button>
+      <button data-command-view="evidence"><i data-lucide="chart-no-axes-combined"></i><span><strong>Open validation</strong><small>Review ROC, precision-recall, and holdout evidence</small></span><kbd>⌘ 5</kbd></button>
       <button data-command-view="fidelity"><i data-lucide="activity"></i><span><strong>View synthetic evidence</strong><small>Stress-test the detector</small></span><kbd>⌘ 6</kbd></button>
     </div>
   </dialog>
