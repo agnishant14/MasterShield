@@ -1,11 +1,47 @@
+# Python bytecode and caches
 __pycache__/
-*.pyc
-.DS_Store
-.vercel/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Python environments and packaging output
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.tox/
+.nox/
+
+# Local configuration and secrets
 .env
 .env.*
 !.env.example
-work/*.json
+.claude/
+.vscode/
+.idea/
+
+# Runtime and generated project artifacts
+.vercel/
+work/
 data/*.jsonl
-outputs/*.zip
 data/*.docs
+outputs/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+
+# Operating-system files
+.DS_Store
+Thumbs.db

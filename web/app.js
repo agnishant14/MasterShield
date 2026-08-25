@@ -54,11 +54,16 @@ function compactNumber(value) {
 }
 
 function money(value, currency = "USD") {
-  return new Intl.NumberFormat("en", {
-    style: "currency",
-    currency: currency === "INR" ? "INR" : "USD",
-    maximumFractionDigits: value > 1000 ? 0 : 2,
-  }).format(Number(value || 0));
+  const currencyCode = String(currency || "USD").trim().toUpperCase();
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency: currencyCode,
+      maximumFractionDigits: Number(value || 0) > 1000 ? 0 : 2,
+    }).format(Number(value || 0));
+  } catch (_error) {
+    return `${currencyCode || "USD"} ${Number(value || 0).toFixed(2)}`;
+  }
 }
 
 function refreshIcons() {

@@ -119,10 +119,12 @@ class NewCapabilityTests(unittest.TestCase):
         memory = EventStore()
         memory.append("audit", {"event": "test"})
         self.assertEqual("test", memory.list("audit")[0]["payload"]["event"])
+        self.assertEqual([], memory.list("audit", 0))
         with tempfile.TemporaryDirectory() as directory:
             sqlite_store = EventStore(str(Path(directory) / "nested" / "events.db"))
             sqlite_store.append("models", {"cycle": 2})
             self.assertEqual(2, sqlite_store.list("models")[0]["payload"]["cycle"])
+            self.assertEqual([], sqlite_store.list("models", 0))
             sqlite_store.close()
 
     def test_feedback_and_mutation_targets_are_retrainable_and_explicit(self) -> None:
@@ -208,9 +210,18 @@ class ClosedLoopTests(unittest.TestCase):
         result = engine.retrain()
         self.assertIn(result["candidate_model_version"], {item["version"] for item in engine.models()})
         self.assertTrue(engine.active_model_version)
+        candidate = next(item for item in engine.models() if item["version"] == result["candidate_model_version"])
+        self.assertEqual("ACTIVE" if result["accepted"] else "REJECTED", candidate["status"])
         rollback = engine.rollback_model(original)
         self.assertEqual(original, rollback["model_version"])
         self.assertEqual(original, engine.active_model_version)
+
+    def test_zero_limit_returns_empty_collections(self) -> None:
+        engine = DefenseEngine(seed=2079)
+        self.assertEqual([], engine.transactions(0))
+        self.assertEqual([], engine.simulations(0))
+        self.assertEqual([], engine.feedback_queue(0))
+        self.assertEqual([], engine.audit(0))
 
     def test_confirmed_analyst_feedback_is_consumed_but_archived(self) -> None:
         engine = DefenseEngine(seed=2078)

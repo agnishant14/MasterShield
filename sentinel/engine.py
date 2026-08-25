@@ -378,7 +378,7 @@ class DefenseEngine:
             candidate_metadata = {
                 "version": candidate_version,
                 "cycle": next_cycle,
-                "status": "APPROVED" if gates["passed"] else "REJECTED",
+                "status": "ACTIVE" if gates["passed"] else "REJECTED",
                 "created_at": self._now(),
                 "dataset_version": self._dataset_version(candidate_training),
                 "training_rows": len(candidate_training),
@@ -564,7 +564,9 @@ class DefenseEngine:
 
     def feedback_queue(self, limit: int = 100) -> list[dict]:
         with self.lock:
-            bounded = max(1, min(int(limit), 500))
+            bounded = max(0, min(int(limit), 500))
+            if bounded == 0:
+                return []
             if self.feedback_records:
                 return list(reversed(self.feedback_records[-bounded:]))
             return [item.get("payload", item) for item in self.store.list("feedback", bounded)]
