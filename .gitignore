@@ -31,6 +31,7 @@ dist/
 
 # Runtime and generated project artifacts
 .vercel/
+docs/
 work/
 data/*.jsonl
 data/*.docs

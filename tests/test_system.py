@@ -271,6 +271,11 @@ class WebArtifactTests(unittest.TestCase):
         for endpoint in ("/api/health", "/api/fidelity", "/api/report", "/api/mutate"):
             self.assertIn(f'url === "{endpoint}"', script)
         self.assertIn('setConnectionStatus(isOfflineDemo() ? "offline" : currentBackend ? "live" : "outdated")', script)
+        self.assertIn("calculateSecurityScore", script)
+        self.assertIn("detected_attack_coverage", script)
+        self.assertIn("feedback_queue_size", script)
+        self.assertIn("refreshLiveOverview", script)
+        self.assertIn("LIVE_OVERVIEW_REFRESH_MS", script)
 
     def test_vercel_wsgi_entrypoint_serves_health_and_console(self) -> None:
         def request(path: str, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], bytes]:

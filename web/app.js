@@ -11,6 +11,8 @@ const state = {
   fidelity: null,
   fidelityLoading: false,
   mutation: null,
+  securityScore: null,
+  overviewRefreshing: false,
 };
 
 const API_CONTROLS = {
@@ -27,6 +29,8 @@ const OFFLINE_ACTION_MESSAGE = "Interactive actions require the Python server; r
 const REQUIRED_UI_CAPABILITIES = ["overview", "attacks", "simulate", "retrain", "fidelity", "report", "mutate", "feedback", "models", "rollback", "audit"];
 const OFFLINE_CAPABILITIES = ["overview", "attacks", "transactions", "fidelity", "report", "mutate", "simulations"];
 const REQUEST_TIMEOUTS_MS = { "/api/retrain": 120000, "/api/fidelity": 90000, "/api/report": 90000, "/api/mutate": 30000 };
+const DISPLAY_TIME_ZONE = "Asia/Kolkata";
+const LIVE_OVERVIEW_REFRESH_MS = 15000;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -49,8 +53,65 @@ function boundedRatio(value) {
   return Math.max(0, Math.min(1, Number.isFinite(number) ? number : 0));
 }
 
+function calculateSecurityScore(data, metrics, recentRows) {
+  const attackRows = recentRows.filter((row) => row.attack_id || Number(row.label) === 1);
+  const legitimateRows = recentRows.filter((row) => !row.attack_id && Number(row.label) !== 1);
+  const liveRecall = attackRows.length
+    ? attackRows.filter((row) => row.decision !== "approve").length / attackRows.length
+    : Number(metrics.recall || 0);
+  const liveFalsePositiveRate = legitimateRows.length
+    ? legitimateRows.filter((row) => row.decision !== "approve").length / legitimateRows.length
+    : Number(metrics.false_positive_rate || 0);
+  const catalogSize = Math.max(1, Number(data.catalog_size || 0));
+  const coverage = boundedRatio(Number(data.detected_attack_coverage || 0) / catalogSize);
+  const modelQuality = (
+    Number(metrics.precision || 0) * 0.25
+    + Number(metrics.recall || 0) * 0.35
+    + Number(metrics.specificity || 0) * 0.25
+    + (1 - Number(metrics.false_positive_rate || 0)) * 0.15
+  );
+  const liveQuality = liveRecall * 0.30 + (1 - liveFalsePositiveRate) * 0.15 + coverage * 0.10;
+  const queuePressure = Math.min(0.08, Number(data.feedback_queue_size || 0) / Math.max(50, recentRows.length) * 0.08);
+  return Math.round(Math.max(0, Math.min(100, (modelQuality * 0.45 + liveQuality) * 100 * (1 - queuePressure))) * 10) / 10;
+}
+
+function renderSecurityScore(nextScore) {
+  const score = Math.max(0, Math.min(100, Number(nextScore || 0)));
+  const hasPrevious = Number.isFinite(state.securityScore);
+  const previous = hasPrevious ? state.securityScore : score;
+  const delta = hasPrevious ? score - state.securityScore : null;
+  state.securityScore = score;
+  const kpi = $("#kpi-f1");
+  const gaugeValue = $("#security-score");
+  const gauge = $("#risk-gauge");
+  const paint = (value) => {
+    const label = value.toFixed(1);
+    if (kpi) kpi.textContent = label;
+    if (gaugeValue) gaugeValue.textContent = label;
+    if (gauge) gauge.style.setProperty("--score", `${value * 3.6}deg`);
+  };
+  if (!hasPrevious || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || Math.abs(score - previous) < 0.05) {
+    paint(score);
+    return delta;
+  }
+  const started = performance.now();
+  const duration = 700;
+  const step = (timestamp) => {
+    const progress = Math.min(1, (timestamp - started) / duration);
+    const eased = 1 - ((1 - progress) ** 3);
+    paint(previous + (score - previous) * eased);
+    if (progress < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  return delta;
+}
+
 function compactNumber(value) {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value || 0));
+}
+
+function formatIST(value, options) {
+  return `${new Intl.DateTimeFormat("en-GB", { timeZone: DISPLAY_TIME_ZONE, ...options }).format(new Date(value))} IST`;
 }
 
 function money(value, currency = "USD") {
@@ -669,18 +730,23 @@ function renderOverview() {
   const f1Delta = latest.f1 - previous.f1;
   const recentRows = Array.isArray(data.recent_transactions) ? data.recent_transactions : [];
   const highRisk = recentRows.filter((row) => Number(row.risk_score || 0) >= 0.7).length;
-  const contained = recentRows.filter((row) => ["decline", "review"].includes(row.decision)).length;
-  const securityScore = Math.round(Math.max(0, Math.min(100, (Number(metrics.recall || 0) * 45) + (Number(metrics.specificity || 0) * 35) + ((1 - Number(metrics.false_positive_rate || 0)) * 20))));
-  $("#kpi-f1").textContent = securityScore;
-  $("#kpi-f1-delta").textContent = `${f1Delta >= 0 ? "+" : ""}${pct(f1Delta)} model stability`;
+  const securityScore = calculateSecurityScore(data, metrics, recentRows);
+  const scoreDelta = renderSecurityScore(securityScore);
+  const scoreDeltaNode = $("#kpi-f1-delta");
+  if (scoreDeltaNode) {
+    const changed = scoreDelta !== null && Math.abs(scoreDelta) >= 0.05;
+    scoreDeltaNode.textContent = changed ? `${scoreDelta > 0 ? "+" : ""}${scoreDelta.toFixed(1)} since last refresh` : "live composite • auto-refresh";
+    scoreDeltaNode.classList.toggle("positive", !changed || scoreDelta > 0);
+    scoreDeltaNode.classList.toggle("negative", changed && scoreDelta < 0);
+  }
   $("#kpi-auc").textContent = compactNumber(data.stream_size || recentRows.length);
   $("#kpi-fpr").textContent = highRisk;
   $("#kpi-coverage").textContent = latest.attack_coverage;
   $("#kpi-catalog-size").textContent = data.catalog_size;
   $("#intro-model").textContent = system.model_version || "model unavailable";
   $("#topbar-model").textContent = system.model_version || "model unavailable";
-  $("#intro-time").textContent = new Date(data.generated_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
-  $("#last-sync").textContent = `synced ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  $("#intro-time").textContent = formatIST(data.generated_at, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  $("#last-sync").textContent = `synced ${formatIST(Date.now(), { hour: "2-digit", minute: "2-digit" })}`;
   $("#cycle-badge").textContent = `CYCLE ${String(data.cycle).padStart(2, "0")}`;
   $("#side-cycle").textContent = `Cycle ${String(data.cycle).padStart(2, "0")}`;
   $("#loop-identify").textContent = data.catalog_size;
@@ -703,8 +769,6 @@ function renderOverview() {
   $("#coverage-title").textContent = activeCoverage === data.catalog_size ? "Full stream coverage" : "Current stream coverage";
   drawBoundaryChart(data);
   drawEvaluationCurves(data);
-  $("#security-score") && ($("#security-score").textContent = securityScore);
-  $("#risk-gauge")?.style.setProperty("--score", `${securityScore * 3.6}deg`);
   $("#system-feedback-status") && ($("#system-feedback-status").textContent = state.feedbackQueued ? `${state.feedbackQueued} QUEUED` : "ARMED");
   renderDefense();
 }
@@ -985,6 +1049,22 @@ async function refreshData() {
   renderScenarioPicker();
 }
 
+async function refreshLiveOverview() {
+  if (document.hidden || isOfflineDemo() || state.overviewRefreshing || !state.capabilities?.has("overview")) return;
+  state.overviewRefreshing = true;
+  try {
+    const overview = await requestJSON("/api/overview");
+    state.overview = overview;
+    state.feedbackQueued = Number(overview.feedback_queue_size || 0);
+    renderOverview();
+    setConnectionStatus("live");
+  } catch (_error) {
+    setConnectionStatus("error");
+  } finally {
+    state.overviewRefreshing = false;
+  }
+}
+
 async function runSimulation() {
   if (!requireCapability("simulate")) return;
   if (!state.selectedAttacks.size) {
@@ -1126,4 +1206,5 @@ document.addEventListener("DOMContentLoaded", () => {
     const currentBackend = updateCapabilities(health);
     setConnectionStatus(isOfflineDemo() ? "offline" : currentBackend ? "live" : "outdated");
   }).catch(() => setConnectionStatus("error")), 30000);
+  setInterval(refreshLiveOverview, LIVE_OVERVIEW_REFRESH_MS);
 });

@@ -1784,6 +1784,12 @@ tbody tr:hover { background: #fff9f5; }
 .footer-brand span:not(.footer-circles) { color: var(--ms-muted); }
 .toast { color: #fff; background: var(--ms-text); border-left-color: var(--ms-orange); }
 
+.footer-brand .mastercard-mark { width: 44px; height: 28px; display: block; flex: 0 0 44px; overflow: visible; filter: drop-shadow(0 4px 7px rgba(92,43,20,.13)); }
+.footer-brand .mastercard-mark + div { display: grid; gap: 3px; }
+.kpi-delta.negative { color: var(--ms-error); }
+.score-value, #security-score { font-variant-numeric: tabular-nums; }
+.risk-gauge { transition: --score .7s cubic-bezier(.2,.8,.2,1); }
+
 button:focus-visible, input:focus-visible { outline-color: rgba(255,95,0,.36); outline-offset: 2px; }
 
 @media (max-width: 1180px) {
