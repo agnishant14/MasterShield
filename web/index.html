@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +10,12 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.js"></script>
   <link rel="stylesheet" href="styles.css">
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
+
 <body>
   <div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
@@ -22,18 +28,26 @@
       </div>
       <div class="tenant-stamp"><span class="status-dot"></span> DEMO ENVIRONMENT</div>
       <nav class="nav-list">
-        <button class="nav-item active" data-view="overview" aria-label="Security overview" title="Security overview"><i data-lucide="layout-dashboard"></i><span>Security Overview</span><kbd>01</kbd></button>
-        <button class="nav-item" data-view="attacks" aria-label="Threat intelligence" title="Threat intelligence"><i data-lucide="scan-search"></i><span>Threat Intelligence</span><kbd>02</kbd></button>
-        <button class="nav-item" data-view="simulate" aria-label="Simulation lab" title="Simulation lab"><i data-lucide="swords"></i><span>Simulation Lab</span><kbd>03</kbd></button>
-        <button class="nav-item" data-view="defense" aria-label="Risk engine" title="Risk engine"><i data-lucide="shield-check"></i><span>Risk Engine</span><kbd>04</kbd></button>
-        <button class="nav-item" data-view="evidence" aria-label="Validation and readiness" title="Validation and readiness"><i data-lucide="file-bar-chart"></i><span>Validation</span><kbd>05</kbd></button>
-        <button class="nav-item" data-view="fidelity" aria-label="Fidelity and robustness" title="Fidelity and robustness"><i data-lucide="activity"></i><span>Fidelity</span><kbd>06</kbd></button>
+        <button class="nav-item active" data-view="overview" aria-label="Security overview" title="Security overview"><i
+            data-lucide="layout-dashboard"></i><span>Security Overview</span><kbd>01</kbd></button>
+        <button class="nav-item" data-view="attacks" aria-label="Threat intelligence" title="Threat intelligence"><i
+            data-lucide="scan-search"></i><span>Threat Intelligence</span><kbd>02</kbd></button>
+        <button class="nav-item" data-view="simulate" aria-label="Simulation lab" title="Simulation lab"><i
+            data-lucide="swords"></i><span>Simulation Lab</span><kbd>03</kbd></button>
+        <button class="nav-item" data-view="defense" aria-label="Risk engine" title="Risk engine"><i
+            data-lucide="shield-check"></i><span>Risk Engine</span><kbd>04</kbd></button>
+        <button class="nav-item" data-view="evidence" aria-label="Validation and readiness"
+          title="Validation and readiness"><i
+            data-lucide="file-bar-chart"></i><span>Validation</span><kbd>05</kbd></button>
+        <button class="nav-item" data-view="fidelity" aria-label="Fidelity and robustness"
+          title="Fidelity and robustness"><i data-lucide="activity"></i><span>Fidelity</span><kbd>06</kbd></button>
       </nav>
       <div class="sidebar-bottom">
         <div class="side-card">
           <div class="side-card-title" id="side-loop-title"><span class="pulse"></span> System operational</div>
           <p id="side-loop-copy">Synthetic payment events are being scored and explained.</p>
-          <div class="side-card-meta"><span id="side-cycle">Cycle 02</span><span id="side-feedback">0 queued</span></div>
+          <div class="side-card-meta"><span id="side-cycle">Cycle 02</span><span id="side-feedback">0 queued</span>
+          </div>
         </div>
         <div class="sidebar-footer">INDEPENDENT CHALLENGE PROTOTYPE<br>MASTERSHIELD / 2026</div>
       </div>
@@ -41,13 +55,19 @@
 
     <main class="main-content">
       <header class="topbar">
-        <div class="breadcrumbs"><span>MASTERSHIELD</span><em>/</em><strong id="crumb-view">SECURITY OVERVIEW</strong></div>
+        <div class="breadcrumbs"><span>MASTERSHIELD</span><em>/</em><strong id="crumb-view">SECURITY OVERVIEW</strong>
+        </div>
         <div class="topbar-actions">
-          <div class="live-status" id="connection-status" data-mode="loading"><span class="status-dot"></span><span id="connection-label">Connecting</span><small id="last-sync">checking status</small></div>
-          <div class="model-chip"><span class="model-chip-label">MODEL</span><strong id="topbar-model">hybrid-logit-c02</strong></div>
+          <div class="live-status" id="connection-status" data-mode="loading"><span class="status-dot"></span><span
+              id="connection-label">Connecting</span><small id="last-sync">checking status</small></div>
+          <div class="model-chip"><span class="model-chip-label">MODEL</span><strong
+              id="topbar-model">hybrid-logit-c02</strong></div>
           <div class="feedback-chip"><i data-lucide="inbox"></i><span id="topbar-feedback">0 queued</span></div>
-          <button class="search-trigger" id="search-trigger" title="Search transactions, entities, and threats" aria-label="Search transactions, entities, and threats"><i data-lucide="search"></i><span>Search</span><kbd>⌘ K</kbd></button>
-          <button class="icon-button command-trigger" id="command-trigger" title="Open command palette" aria-label="Open command palette"><i data-lucide="command"></i></button>
+          <button class="search-trigger" id="search-trigger" title="Search transactions, entities, and threats"
+            aria-label="Search transactions, entities, and threats"><i
+              data-lucide="search"></i><span>Search</span><kbd>⌘ K</kbd></button>
+          <button class="icon-button command-trigger" id="command-trigger" title="Open command palette"
+            aria-label="Open command palette"><i data-lucide="command"></i></button>
         </div>
       </header>
 
@@ -56,162 +76,668 @@
           <div>
             <div class="eyebrow"><span class="eyebrow-line"></span> SECURITY INTELLIGENCE</div>
             <h1>See the risk story before it becomes a loss.</h1>
-            <p class="intro-copy">MasterShield connects payment, device, network, and behavioral signals into one explainable decision layer for the digital economy.</p>
-            <div class="hero-actions"><button class="primary-button" data-view="simulate"><i data-lucide="play"></i> Run a judge demo</button><span class="hero-note"><span class="status-dot"></span> Synthetic transaction data</span></div>
+            <p class="intro-copy">MasterShield connects payment, device, network, and behavioral signals into one
+              explainable decision layer for the digital economy.</p>
+            <div class="hero-actions"><button class="primary-button" data-view="simulate"><i data-lucide="play"></i> Run
+                a judge demo</button><span class="hero-note"><span class="status-dot"></span> Synthetic transaction
+                data</span></div>
           </div>
           <div class="intro-rail">
             <div class="intro-side">
               <div class="date-label">CURRENT MODEL</div>
               <div class="model-name" id="intro-model">hybrid-logit-c02</div>
-              <div class="model-meta"><span class="live-pill"><span class="status-dot"></span><span id="model-status-label">LOADING</span></span><span id="intro-time">--</span></div>
+              <div class="model-meta"><span class="live-pill"><span class="status-dot"></span><span
+                    id="model-status-label">LOADING</span></span><span id="intro-time">--</span></div>
             </div>
             <div class="intro-visual" aria-hidden="true">
               <div class="intro-orbit orbit-one"></div>
               <div class="intro-orbit orbit-two"></div>
               <div class="intro-core"><i data-lucide="activity"></i><span>MODEL<br>ONLINE</span></div>
-              <span class="intro-spark spark-one"></span><span class="intro-spark spark-two"></span><span class="intro-spark spark-three"></span>
+              <span class="intro-spark spark-one"></span><span class="intro-spark spark-two"></span><span
+                class="intro-spark spark-three"></span>
             </div>
           </div>
         </div>
 
         <div class="kpi-strip">
-          <div class="kpi-cell"><div class="kpi-label">SECURITY SCORE</div><div class="kpi-value score-value" id="kpi-f1">--</div><div class="kpi-delta positive" id="kpi-f1-delta">calibrated holdout</div></div>
-          <div class="kpi-cell"><div class="kpi-label">EVENTS ANALYZED</div><div class="kpi-value" id="kpi-auc">--</div><div class="kpi-delta">synthetic stream</div></div>
-          <div class="kpi-cell"><div class="kpi-label">HIGH-RISK EVENTS</div><div class="kpi-value" id="kpi-fpr">--</div><div class="kpi-delta accent">requires analyst attention</div></div>
-          <div class="kpi-cell"><div class="kpi-label">ATTACK COVERAGE</div><div class="kpi-value"><span id="kpi-coverage">--</span><small class="kpi-unit"> / <span id="kpi-catalog-size">--</span></small></div><div class="kpi-delta positive">scenarios detected in the stream</div></div>
+          <div class="kpi-cell">
+            <div class="kpi-label">SECURITY SCORE</div>
+            <div class="kpi-value score-value" id="kpi-f1">--</div>
+            <div class="kpi-delta positive" id="kpi-f1-delta">calibrated holdout</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">EVENTS ANALYZED</div>
+            <div class="kpi-value" id="kpi-auc">--</div>
+            <div class="kpi-delta">synthetic stream</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">HIGH-RISK EVENTS</div>
+            <div class="kpi-value" id="kpi-fpr">--</div>
+            <div class="kpi-delta accent">requires analyst attention</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">ATTACK COVERAGE</div>
+            <div class="kpi-value"><span id="kpi-coverage">--</span><small class="kpi-unit"> / <span
+                  id="kpi-catalog-size">--</span></small></div>
+            <div class="kpi-delta positive">scenarios detected in the stream</div>
+          </div>
         </div>
 
-        <div class="section-head"><div><div class="eyebrow muted"><span class="eyebrow-line"></span> OPERATING PICTURE</div><h2>What's happening across the synthetic payment stream.</h2></div><button class="text-button" data-view="simulate">Open simulation lab <i data-lucide="arrow-up-right"></i></button></div>
+        <div class="section-head">
+          <div>
+            <div class="eyebrow muted"><span class="eyebrow-line"></span> OPERATING PICTURE</div>
+            <h2>What's happening across the synthetic payment stream.</h2>
+          </div><button class="text-button" data-view="simulate">Open simulation lab <i
+              data-lucide="arrow-up-right"></i></button>
+        </div>
 
         <div class="command-center-grid">
           <div class="network-panel">
-            <div class="network-panel-head"><div><span class="surface-kicker">LIVE THREAT NETWORK</span><h3>Trace the threat across the ecosystem</h3><p>Entities and relationships are derived from the current synthetic event stream.</p></div><span class="network-live"><span class="status-dot"></span> STREAMING</span></div>
-            <div class="threat-network" id="threat-network" role="application" aria-label="Synthetic threat network showing relationships between customers, devices, merchants, IPs, locations, and risk events"></div>
-            <div class="network-legend"><span><i class="legend-node normal"></i> entity</span><span><i class="legend-node signal"></i> signal</span><span><i class="legend-node critical"></i> high risk</span><span class="mono">synthetic data / 140 events</span></div>
+            <div class="network-panel-head">
+              <div><span class="surface-kicker">LIVE THREAT NETWORK</span>
+                <h3>Trace the threat across the ecosystem</h3>
+                <p>Entities and relationships are derived from the current synthetic event stream.</p>
+              </div><span class="network-live"><span class="status-dot"></span> STREAMING</span>
+            </div>
+            <div class="threat-network" id="threat-network" role="application"
+              aria-label="Synthetic threat network showing relationships between customers, devices, merchants, IPs, locations, and risk events">
+            </div>
+            <div class="network-legend"><span><i class="legend-node normal"></i> entity</span><span><i
+                  class="legend-node signal"></i> signal</span><span><i class="legend-node critical"></i> high
+                risk</span><span class="mono">synthetic data / 140 events</span></div>
           </div>
           <div class="command-center-rail">
-            <div class="signal-panel"><div class="signal-panel-head"><span class="surface-kicker">THREAT LANDSCAPE</span><span class="mono">24 SCENARIOS</span></div><div id="threat-landscape" class="threat-landscape"></div></div>
-            <div class="signal-panel"><div class="signal-panel-head"><span class="surface-kicker">SYSTEM STATUS</span><span class="status-badge operational"><span class="status-dot"></span> OPERATIONAL</span></div><div class="system-status-list compact"><div><span><i data-lucide="radio"></i> Data pipeline</span><strong>ONLINE</strong></div><div><span><i data-lucide="brain-circuit"></i> Risk engine</span><strong>ONLINE</strong></div><div><span><i data-lucide="scan-line"></i> Detection engine</span><strong>ONLINE</strong></div></div></div>
+            <div class="signal-panel">
+              <div class="signal-panel-head"><span class="surface-kicker">THREAT LANDSCAPE</span><span class="mono">24
+                  SCENARIOS</span></div>
+              <div id="threat-landscape" class="threat-landscape"></div>
+            </div>
+            <div class="signal-panel">
+              <div class="signal-panel-head"><span class="surface-kicker">SYSTEM STATUS</span><span
+                  class="status-badge operational"><span class="status-dot"></span> OPERATIONAL</span></div>
+              <div class="system-status-list compact">
+                <div><span><i data-lucide="radio"></i> Data pipeline</span><strong>ONLINE</strong></div>
+                <div><span><i data-lucide="brain-circuit"></i> Risk engine</span><strong>ONLINE</strong></div>
+                <div><span><i data-lucide="scan-line"></i> Detection engine</span><strong>ONLINE</strong></div>
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="overview-grid">
           <div class="surface loop-surface risk-hero-card">
-            <div class="surface-head"><div><span class="surface-kicker">EXPLAINABLE RISK</span><h3>Security Score</h3></div><span class="cycle-badge" id="cycle-badge">DEMO / CYCLE 02</span></div>
-            <div class="risk-score-layout"><div class="risk-gauge" id="risk-gauge"><div><strong id="security-score">92</strong><span>OUT OF 100</span></div></div><div class="risk-summary"><span class="risk-status">LOW RISK</span><strong>Protected operating picture</strong><p>Model confidence remains high on the current synthetic holdout. This explainable score is not a production claim.</p><div class="risk-mini-grid"><span><b>+18</b> device trust</span><span><b>+12</b> location</span><span><b>+07</b> behavior</span><span><b>+03</b> network</span></div></div></div>
+            <div class="surface-head">
+              <div><span class="surface-kicker">EXPLAINABLE RISK</span>
+                <h3>Security Score</h3>
+              </div><span class="cycle-badge" id="cycle-badge">DEMO / CYCLE 02</span>
+            </div>
+            <div class="risk-score-layout">
+              <div class="risk-gauge" id="risk-gauge">
+                <div><strong id="security-score">92</strong><span>OUT OF 100</span></div>
+              </div>
+              <div class="risk-summary"><span class="risk-status">LOW RISK</span><strong>Protected operating
+                  picture</strong>
+                <p>Model confidence remains high on the current synthetic holdout. This explainable score is not a
+                  production claim.</p>
+                <div class="risk-mini-grid"><span><b>+18</b> device trust</span><span><b>+12</b>
+                    location</span><span><b>+07</b> behavior</span><span><b>+03</b> network</span></div>
+              </div>
+            </div>
             <div class="risk-card-divider"></div>
             <div class="loop-diagram">
-              <div class="loop-step"><div class="step-index red">01</div><div class="step-copy"><strong>Detect</strong><span>signals arrive from the event stream</span></div><div class="step-stat" id="loop-identify">24</div></div>
+              <div class="loop-step">
+                <div class="step-index red">01</div>
+                <div class="step-copy"><strong>Detect</strong><span>signals arrive from the event stream</span></div>
+                <div class="step-stat" id="loop-identify">24</div>
+              </div>
               <div class="loop-connector"><span></span></div>
-              <div class="loop-step"><div class="step-index amber">02</div><div class="step-copy"><strong>Generate</strong><span>a high-fidelity attack stream</span></div><div class="step-stat" id="loop-generate">--</div></div>
+              <div class="loop-step">
+                <div class="step-index amber">02</div>
+                <div class="step-copy"><strong>Generate</strong><span>a high-fidelity attack stream</span></div>
+                <div class="step-stat" id="loop-generate">--</div>
+              </div>
               <div class="loop-connector"><span></span></div>
-              <div class="loop-step"><div class="step-index teal">03</div><div class="step-copy"><strong>Decide</strong><span>approve, review, or decline with reasons</span></div><div class="step-stat" id="loop-defend">--</div></div>
+              <div class="loop-step">
+                <div class="step-index teal">03</div>
+                <div class="step-copy"><strong>Decide</strong><span>approve, review, or decline with reasons</span>
+                </div>
+                <div class="step-stat" id="loop-defend">--</div>
+              </div>
               <div class="loop-connector"><span></span></div>
-              <div class="loop-step"><div class="step-index violet">04</div><div class="step-copy"><strong>Act</strong><span>feedback informs the next model cycle</span></div><div class="step-stat" id="loop-learn">--</div></div>
+              <div class="loop-step">
+                <div class="step-index violet">04</div>
+                <div class="step-copy"><strong>Act</strong><span>feedback informs the next model cycle</span></div>
+                <div class="step-stat" id="loop-learn">--</div>
+              </div>
             </div>
-            <div class="loop-footer"><span class="pulse"></span><span>Feedback queue armed</span><span class="mono" id="loop-queue">0 rows</span></div>
+            <div class="loop-footer"><span class="pulse"></span><span>Feedback queue armed</span><span class="mono"
+                id="loop-queue">0 rows</span></div>
           </div>
 
           <div class="surface boundary-surface">
-            <div class="surface-head"><div><span class="surface-kicker">THREAT ACTIVITY</span><h3>Signals moving through the system</h3></div><span class="chart-note">simulated holdout</span></div>
-            <div class="boundary-chart-wrap"><canvas id="boundary-chart" width="660" height="270" aria-label="Risk score distribution for legitimate and attack holdout rows" role="img"></canvas><div class="chart-legend"><span><i class="legend-dot legit"></i> legitimate</span><span><i class="legend-dot attack"></i> attack</span><span><i class="legend-line"></i> threshold</span></div></div>
-            <div class="boundary-foot"><div><span class="foot-label">CALIBRATED THRESHOLD</span><strong id="threshold-value">--</strong></div><div><span class="foot-label">P95 DECISION LATENCY</span><strong id="latency-p95">--</strong></div><div><span class="foot-label">MODEL FAMILY</span><strong>Hybrid logistic</strong></div></div>
+            <div class="surface-head">
+              <div><span class="surface-kicker">THREAT ACTIVITY</span>
+                <h3>Signals moving through the system</h3>
+              </div><span class="chart-note">simulated holdout</span>
+            </div>
+            <div class="boundary-chart-wrap"><canvas id="boundary-chart" width="660" height="270"
+                aria-label="Risk score distribution for legitimate and attack holdout rows" role="img"></canvas>
+              <div class="chart-legend"><span><i class="legend-dot legit"></i> legitimate</span><span><i
+                    class="legend-dot attack"></i> attack</span><span><i class="legend-line"></i> threshold</span></div>
+            </div>
+            <div class="boundary-foot">
+              <div><span class="foot-label">CALIBRATED THRESHOLD</span><strong id="threshold-value">--</strong></div>
+              <div><span class="foot-label">P95 DECISION LATENCY</span><strong id="latency-p95">--</strong></div>
+              <div><span class="foot-label">MODEL FAMILY</span><strong>Hybrid logistic</strong></div>
+            </div>
           </div>
         </div>
 
         <div class="lower-grid">
           <div class="surface stream-surface">
-            <div class="surface-head"><div><span class="surface-kicker">LIVE ACTIVITY FEED</span><h3>Recent security events</h3></div><button class="text-button" data-view="defense">Open risk engine <i data-lucide="arrow-up-right"></i></button></div>
-            <div class="table-wrap"><table><thead><tr><th>TRANSACTION</th><th>RAIL / CHANNEL</th><th>AMOUNT</th><th>RISK</th><th>DECISION</th><th><span class="sr-only">DETAILS</span></th></tr></thead><tbody id="stream-table"></tbody></table></div>
+            <div class="surface-head">
+              <div><span class="surface-kicker">LIVE ACTIVITY FEED</span>
+                <h3>Recent security events</h3>
+              </div><button class="text-button" data-view="defense">Open risk engine <i
+                  data-lucide="arrow-up-right"></i></button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>TRANSACTION</th>
+                    <th>RAIL / CHANNEL</th>
+                    <th>AMOUNT</th>
+                    <th>RISK</th>
+                    <th>DECISION</th>
+                    <th><span class="sr-only">DETAILS</span></th>
+                  </tr>
+                </thead>
+                <tbody id="stream-table"></tbody>
+              </table>
+            </div>
           </div>
           <div class="surface coverage-surface">
-            <div class="surface-head"><div><span class="surface-kicker">ATTACK SURFACE</span><h3>What the stream is finding</h3></div><button class="icon-button quiet" title="Refresh overview" aria-label="Refresh overview" id="refresh-overview"><i data-lucide="refresh-cw"></i></button></div>
+            <div class="surface-head">
+              <div><span class="surface-kicker">ATTACK SURFACE</span>
+                <h3>What the stream is finding</h3>
+              </div><button class="icon-button quiet" title="Refresh overview" aria-label="Refresh overview"
+                id="refresh-overview"><i data-lucide="refresh-cw"></i></button>
+            </div>
             <div id="attack-mix" class="attack-mix"></div>
-            <div class="coverage-total"><div class="coverage-ring" id="coverage-ring"><span id="coverage-ring-value">--</span></div><div><strong id="coverage-title">Coverage</strong><span>distinct attack scenarios active in the current stream</span></div></div>
+            <div class="coverage-total">
+              <div class="coverage-ring" id="coverage-ring"><span id="coverage-ring-value">--</span></div>
+              <div><strong id="coverage-title">Coverage</strong><span>distinct attack scenarios active in the current
+                  stream</span></div>
+            </div>
           </div>
         </div>
       </section>
 
       <section class="view" id="view-attacks">
-        <div class="page-title-row"><div><div class="eyebrow"><span class="eyebrow-line"></span> IDENTIFY / ATTACK INTELLIGENCE</div><h1>Attack scenario library.</h1><p>Browse the hypotheses, signals, and controls used to stress the payment detector.</p></div><div class="title-stat"><span>VISIBLE SCENARIOS</span><strong id="attack-count">--</strong><small id="attack-count-meta">from the full catalog</small></div></div>
-        <div class="attack-landscape-panel"><div class="attack-landscape-head"><div><span class="surface-kicker">THREAT LANDSCAPE</span><h3>Emerging attack intelligence</h3><p>Bubble size represents observed synthetic samples; color represents severity.</p></div><span class="network-live"><span class="status-dot"></span> CLICK TO FILTER</span></div><div class="attack-bubble-field" id="attack-bubble-field"></div></div>
-        <div class="toolbar"><div class="search-field"><i data-lucide="search"></i><input id="attack-search" type="search" placeholder="Search by attack, rail, or channel..." aria-label="Search attacks"></div><div class="filter-group"><button class="filter-button active" aria-pressed="true" data-filter="all">All</button><button class="filter-button" aria-pressed="false" data-filter="Critical">Critical</button><button class="filter-button" aria-pressed="false" data-filter="High">High</button><button class="filter-button" aria-pressed="false" data-filter="Medium">Medium</button></div></div>
-        <div class="attack-table surface"><table><thead><tr><th>SCENARIO</th><th>FAMILY</th><th>RAIL / CHANNEL</th><th>GENAI ROLE</th><th>LIVE DETECTION</th><th></th></tr></thead><tbody id="attack-table-body"></tbody></table></div>
+        <div class="page-title-row">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> IDENTIFY / ATTACK INTELLIGENCE</div>
+            <h1>Attack scenario library.</h1>
+            <p>Browse the hypotheses, signals, and controls used to stress the payment detector.</p>
+          </div>
+          <div class="title-stat"><span>VISIBLE SCENARIOS</span><strong id="attack-count">--</strong><small
+              id="attack-count-meta">from the full catalog</small></div>
+        </div>
+        <div class="attack-landscape-panel">
+          <div class="attack-landscape-head">
+            <div><span class="surface-kicker">THREAT LANDSCAPE</span>
+              <h3>Emerging attack intelligence</h3>
+              <p>Bubble size represents observed synthetic samples; color represents severity.</p>
+            </div><span class="network-live"><span class="status-dot"></span> CLICK TO FILTER</span>
+          </div>
+          <div class="attack-bubble-field" id="attack-bubble-field"></div>
+        </div>
+        <div class="toolbar">
+          <div class="search-field"><i data-lucide="search"></i><input id="attack-search" type="search"
+              placeholder="Search by attack, rail, or channel..." aria-label="Search attacks"></div>
+          <div class="filter-group"><button class="filter-button active" aria-pressed="true"
+              data-filter="all">All</button><button class="filter-button" aria-pressed="false"
+              data-filter="Critical">Critical</button><button class="filter-button" aria-pressed="false"
+              data-filter="High">High</button><button class="filter-button" aria-pressed="false"
+              data-filter="Medium">Medium</button></div>
+        </div>
+        <div class="attack-table surface">
+          <table>
+            <thead>
+              <tr>
+                <th>SCENARIO</th>
+                <th>FAMILY</th>
+                <th>RAIL / CHANNEL</th>
+                <th>GENAI ROLE</th>
+                <th>LIVE DETECTION</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="attack-table-body"></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="view" id="view-simulate">
-        <div class="page-title-row"><div><div class="eyebrow"><span class="eyebrow-line"></span> GENERATE / SIMULATION LAB</div><h1>Run an adversarial stream.</h1><p>Choose one or more scenarios, score synthetic events, and inspect the exact model errors.</p></div><div class="title-stat warm"><span>FEEDBACK QUEUE</span><strong id="simulation-queue">0</strong><small>rows awaiting retraining</small></div></div>
-        <div class="simulation-layout">
-          <div class="surface sim-builder"><div class="surface-head"><div><span class="surface-kicker">RED-TEAM BUILDER</span><h3>Scenario recipe</h3></div><div class="builder-head-actions"><button class="text-button" id="load-demo-scenario" type="button" title="Load a judge-ready demonstration preset">Load judge demo <i data-lucide="sparkles"></i></button><span class="builder-status"><span class="status-dot amber-dot"></span> ready</span></div></div>
-            <div class="field-block"><div class="field-label-row"><label>ATTACK HYPOTHESES</label><div class="scenario-tools"><span id="scenario-selection-summary" class="selection-summary">4 selected</span><button class="icon-button quiet" id="select-all-scenarios" type="button" title="Select all attack hypotheses" aria-label="Select all attack hypotheses"><i data-lucide="list-checks"></i></button><button class="icon-button quiet" id="clear-scenarios" type="button" title="Clear attack hypotheses" aria-label="Clear attack hypotheses"><i data-lucide="list-x"></i></button></div></div><div id="scenario-picker" class="scenario-picker"></div></div>
-            <div class="field-row"><div class="field-block"><label for="volume-slider">EVENT VOLUME <output id="volume-output">80 events</output></label><input id="volume-slider" class="range-slider" type="range" min="20" max="500" step="10" value="80" aria-label="Synthetic event volume"></div><div class="field-block"><label>ATTACK INTENSITY</label><div class="segmented" id="intensity-picker"><button aria-pressed="false" data-intensity="0.72">LOW</button><button class="active" aria-pressed="true" data-intensity="1.0">BASE</button><button aria-pressed="false" data-intensity="1.28">HIGH</button></div></div></div>
-            <div class="sim-callout"><div class="callout-mark"><i data-lucide="sliders-horizontal"></i></div><div><strong>Correlated signals enabled.</strong><span>Amount, device, graph, session, and content features move together.</span></div></div>
-            <button class="primary-button" id="run-simulation"><i data-lucide="play"></i> Run adversarial stream <span class="button-arrow">↗</span></button>
+        <div class="page-title-row">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> GENERATE / SIMULATION LAB</div>
+            <h1>Run an adversarial stream.</h1>
+            <p>Choose one or more scenarios, score synthetic events, and inspect the exact model errors.</p>
           </div>
-          <div class="surface sim-result"><div class="surface-head"><div><span class="surface-kicker">LATEST RUN</span><h3 id="sim-result-title">No simulation yet</h3></div><span class="run-id mono" id="sim-run-id">--</span></div><div id="sim-result-empty" class="empty-state"><div class="empty-glyph"><i data-lucide="flask-conical"></i></div><strong>No run selected.</strong><span>Run a scenario to see detection, misses, and control false positives.</span></div><div id="sim-result-content" class="hidden"><div class="result-kpis"><div><span>DETECTED</span><strong id="sim-detected">--</strong></div><div><span>MISSED</span><strong id="sim-missed">--</strong></div><div><span>CONTROL FPs</span><strong id="sim-fps">--</strong><small id="sim-fps-denominator"></small></div><div><span>MEAN RISK</span><strong id="sim-risk">--</strong></div></div><div class="result-bar"><div class="result-bar-track"><span id="result-bar-fill"></span></div><div><span>STREAM DETECTION RATE</span><strong id="sim-rate">--</strong></div></div><div class="fidelity-strip" id="fidelity-strip"></div><div class="sample-list" id="sim-samples"></div></div></div>
+          <div class="title-stat warm"><span>FEEDBACK QUEUE</span><strong id="simulation-queue">0</strong><small>rows
+              awaiting retraining</small></div>
+        </div>
+        <div class="simulation-layout">
+          <div class="surface sim-builder">
+            <div class="surface-head">
+              <div><span class="surface-kicker">RED-TEAM BUILDER</span>
+                <h3>Scenario recipe</h3>
+              </div>
+              <div class="builder-head-actions"><button class="text-button" id="load-demo-scenario" type="button"
+                  title="Load a judge-ready demonstration preset">Load judge demo <i
+                    data-lucide="sparkles"></i></button><span class="builder-status"><span
+                    class="status-dot amber-dot"></span> ready</span></div>
+            </div>
+            <div class="field-block">
+              <div class="field-label-row"><label>ATTACK HYPOTHESES</label>
+                <div class="scenario-tools"><span id="scenario-selection-summary" class="selection-summary">4
+                    selected</span><button class="icon-button quiet" id="select-all-scenarios" type="button"
+                    title="Select all attack hypotheses" aria-label="Select all attack hypotheses"><i
+                      data-lucide="list-checks"></i></button><button class="icon-button quiet" id="clear-scenarios"
+                    type="button" title="Clear attack hypotheses" aria-label="Clear attack hypotheses"><i
+                      data-lucide="list-x"></i></button></div>
+              </div>
+              <div id="scenario-picker" class="scenario-picker"></div>
+            </div>
+            <div class="field-row">
+              <div class="field-block"><label for="volume-slider">EVENT VOLUME <output id="volume-output">80
+                    events</output></label><input id="volume-slider" class="range-slider" type="range" min="20"
+                  max="500" step="10" value="80" aria-label="Synthetic event volume"></div>
+              <div class="field-block"><label>ATTACK INTENSITY</label>
+                <div class="segmented" id="intensity-picker"><button aria-pressed="false"
+                    data-intensity="0.72">LOW</button><button class="active" aria-pressed="true"
+                    data-intensity="1.0">BASE</button><button aria-pressed="false" data-intensity="1.28">HIGH</button>
+                </div>
+              </div>
+            </div>
+            <div class="sim-callout">
+              <div class="callout-mark"><i data-lucide="sliders-horizontal"></i></div>
+              <div><strong>Correlated signals enabled.</strong><span>Amount, device, graph, session, and content
+                  features move together.</span></div>
+            </div>
+            <button class="primary-button" id="run-simulation"><i data-lucide="play"></i> Run adversarial stream <span
+                class="button-arrow">↗</span></button>
+          </div>
+          <div class="surface sim-result">
+            <div class="surface-head">
+              <div><span class="surface-kicker">LATEST RUN</span>
+                <h3 id="sim-result-title">No simulation yet</h3>
+              </div><span class="run-id mono" id="sim-run-id">--</span>
+            </div>
+            <div id="sim-result-empty" class="empty-state">
+              <div class="empty-glyph"><i data-lucide="flask-conical"></i></div><strong>No run
+                selected.</strong><span>Run a scenario to see detection, misses, and control false positives.</span>
+            </div>
+            <div id="sim-result-content" class="hidden">
+              <div class="result-kpis">
+                <div><span>DETECTED</span><strong id="sim-detected">--</strong></div>
+                <div><span>MISSED</span><strong id="sim-missed">--</strong></div>
+                <div><span>CONTROL FPs</span><strong id="sim-fps">--</strong><small id="sim-fps-denominator"></small>
+                </div>
+                <div><span>MEAN RISK</span><strong id="sim-risk">--</strong></div>
+              </div>
+              <div class="result-bar">
+                <div class="result-bar-track"><span id="result-bar-fill"></span></div>
+                <div><span>STREAM DETECTION RATE</span><strong id="sim-rate">--</strong></div>
+              </div>
+              <div class="fidelity-strip" id="fidelity-strip"></div>
+              <div class="sample-list" id="sim-samples"></div>
+            </div>
+          </div>
         </div>
         <div class="simulation-story-panel">
-          <div class="simulation-story-head"><div><span class="surface-kicker">ATTACK TRACE / SYNTHETIC DEMO</span><h3>Watch one adversarial condition move through the detector</h3></div><span id="simulation-story-status" class="network-live"><span class="status-dot"></span> READY</span></div>
-          <div class="simulation-pipeline" id="simulation-pipeline"><div class="pipeline-stage"><span>01</span><i data-lucide="sparkles"></i><strong>Attack generated</strong><small>scenario recipe selected</small></div><div class="pipeline-link"></div><div class="pipeline-stage"><span>02</span><i data-lucide="sliders-horizontal"></i><strong>Signals modified</strong><small>correlated features shift</small></div><div class="pipeline-link"></div><div class="pipeline-stage"><span>03</span><i data-lucide="brain-circuit"></i><strong>Model analysis</strong><small>risk factors assembled</small></div><div class="pipeline-link"></div><div class="pipeline-stage"><span>04</span><i data-lucide="shield-alert"></i><strong>Detector response</strong><small>decision and feedback</small></div></div>
-          <div id="simulation-comparison" class="simulation-comparison"><div><span>CONTROL BASELINE</span><strong>--</strong><small>generated legitimate control sample</small></div><div class="comparison-arrow">→</div><div class="critical-comparison"><span>ATTACK STREAM</span><strong>--</strong><small>run a simulation to compare</small></div><div class="comparison-factors"><span>Waiting for measured signals</span></div></div>
+          <div class="simulation-story-head">
+            <div><span class="surface-kicker">ATTACK TRACE / SYNTHETIC DEMO</span>
+              <h3>Watch one adversarial condition move through the detector</h3>
+            </div><span id="simulation-story-status" class="network-live"><span class="status-dot"></span> READY</span>
+          </div>
+          <div class="simulation-pipeline" id="simulation-pipeline">
+            <div class="pipeline-stage"><span>01</span><i data-lucide="sparkles"></i><strong>Attack
+                generated</strong><small>scenario recipe selected</small></div>
+            <div class="pipeline-link"></div>
+            <div class="pipeline-stage"><span>02</span><i data-lucide="sliders-horizontal"></i><strong>Signals
+                modified</strong><small>correlated features shift</small></div>
+            <div class="pipeline-link"></div>
+            <div class="pipeline-stage"><span>03</span><i data-lucide="brain-circuit"></i><strong>Model
+                analysis</strong><small>risk factors assembled</small></div>
+            <div class="pipeline-link"></div>
+            <div class="pipeline-stage"><span>04</span><i data-lucide="shield-alert"></i><strong>Detector
+                response</strong><small>decision and feedback</small></div>
+          </div>
+          <div id="simulation-comparison" class="simulation-comparison">
+            <div><span>CONTROL BASELINE</span><strong>--</strong><small>generated legitimate control sample</small>
+            </div>
+            <div class="comparison-arrow">→</div>
+            <div class="critical-comparison"><span>ATTACK STREAM</span><strong>--</strong><small>run a simulation to
+                compare</small></div>
+            <div class="comparison-factors"><span>Waiting for measured signals</span></div>
+          </div>
         </div>
-        <div class="surface feedback-surface"><div class="surface-head"><div><span class="surface-kicker">LEARNING QUEUE</span><h3>Hard cases flow back to defense</h3></div><button class="primary-button small" id="retrain-button"><i data-lucide="refresh-cw"></i> Retrain model</button></div><div class="feedback-track"><div class="feedback-node red-node"><span>01</span><strong>Generate</strong><small>attack stream</small></div><div class="feedback-line"><span></span></div><div class="feedback-node amber-node"><span>02</span><strong>Score</strong><small>misses + false positives</small></div><div class="feedback-line"><span></span></div><div class="feedback-node teal-node"><span>03</span><strong>Promote</strong><small>hard cases</small></div><div class="feedback-line"><span></span></div><div class="feedback-node violet-node"><span>04</span><strong>Retrain</strong><small>new frontier</small></div></div></div>
+        <div class="surface feedback-surface">
+          <div class="surface-head">
+            <div><span class="surface-kicker">LEARNING QUEUE</span>
+              <h3>Hard cases flow back to defense</h3>
+            </div><button class="primary-button small" id="retrain-button"><i data-lucide="refresh-cw"></i> Retrain
+              model</button>
+          </div>
+          <div class="feedback-track">
+            <div class="feedback-node red-node"><span>01</span><strong>Generate</strong><small>attack stream</small>
+            </div>
+            <div class="feedback-line"><span></span></div>
+            <div class="feedback-node amber-node"><span>02</span><strong>Score</strong><small>misses + false
+                positives</small></div>
+            <div class="feedback-line"><span></span></div>
+            <div class="feedback-node teal-node"><span>03</span><strong>Promote</strong><small>hard cases</small></div>
+            <div class="feedback-line"><span></span></div>
+            <div class="feedback-node violet-node"><span>04</span><strong>Retrain</strong><small>new frontier</small>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="view" id="view-defense">
-        <div class="page-title-row"><div><div class="eyebrow"><span class="eyebrow-line"></span> DEFEND / MODEL PERFORMANCE</div><h1>Model performance.</h1><p>Inspect the calibrated threshold, error mix, and signals driving the current detector.</p></div><div class="title-stat teal"><span>MODEL VERSION</span><strong id="defense-version">C02</strong><small>hybrid logistic + priors</small></div></div>
-        <div class="defense-kpis"><div class="metric-panel"><span>PRECISION</span><strong id="def-precision">--</strong><small>low-friction approvals</small></div><div class="metric-panel"><span>RECALL</span><strong id="def-recall">--</strong><small>attack capture</small></div><div class="metric-panel"><span>SPECIFICITY</span><strong id="def-specificity">--</strong><small>legitimate confidence</small></div><div class="metric-panel dark"><span>THRESHOLD</span><strong id="def-threshold">--</strong><small>calibrated guardrail</small></div></div>
-        <div class="risk-engine-panel"><div class="risk-engine-head"><div><span class="surface-kicker">RISK ENGINE / EXPLAINABLE PROCESSING</span><h3>How MasterShield reaches a decision</h3><p>Each stage is grounded in the signals and policies already used by the prototype.</p></div><span class="network-live"><span class="status-dot"></span> MODEL ONLINE</span></div><div class="risk-engine-pipeline" id="risk-engine-pipeline"><div><span>01</span><i data-lucide="inbox"></i><strong>Event</strong><small>payment received</small></div><b>→</b><div><span>02</span><i data-lucide="scan-line"></i><strong>Signals</strong><small>device + graph + context</small></div><b>→</b><div><span>03</span><i data-lucide="braces"></i><strong>Features</strong><small>24 model inputs</small></div><b>→</b><div><span>04</span><i data-lucide="brain-circuit"></i><strong>Analysis</strong><small>hybrid model + priors</small></div><b>→</b><div class="engine-decision"><span>05</span><i data-lucide="shield-alert"></i><strong>Decision</strong><small>risk score + policy</small></div></div></div>
-        <div class="defense-grid"><div class="surface importance-surface"><div class="surface-head"><div><span class="surface-kicker">MODEL EXPLANATION</span><h3>Signals with the most lift</h3></div><span class="mono muted-text">absolute weight</span></div><div id="importance-list" class="importance-list"></div></div><div class="surface matrix-surface"><div class="surface-head"><div><span class="surface-kicker">GENERATED HOLDOUT</span><h3>Decision quality</h3></div><span class="calibration-chip">FPR guardrail 3.5%</span></div><div class="matrix"><div class="matrix-axis y-axis"><span>actual attack</span><span>actual legitimate transaction</span></div><div class="matrix-grid"><div class="matrix-cell tp"><span>TP</span><strong id="matrix-tp">--</strong><small>caught</small></div><div class="matrix-cell fn"><span>FN</span><strong id="matrix-fn">--</strong><small>missed</small></div><div class="matrix-cell fp"><span>FP</span><strong id="matrix-fp">--</strong><small>friction</small></div><div class="matrix-cell tn"><span>TN</span><strong id="matrix-tn">--</strong><small>clean</small></div></div><div class="matrix-axis x-axis"><span>flag or review</span><span>approve</span></div></div><div class="matrix-foot"><span class="status-dot"></span><span id="matrix-footnote">Untouched generated holdout.</span></div></div></div>
-        <div class="surface history-surface"><div class="surface-head"><div><span class="surface-kicker">CLOSED-LOOP HISTORY</span><h3>How the model has changed</h3></div></div><div id="history-list" class="history-list"></div></div>
-        <div class="surface history-surface"><div class="surface-head"><div><span class="surface-kicker">MODEL GOVERNANCE</span><h3>Champion, challengers, and rollback</h3></div></div><div id="model-lifecycle" class="history-list"></div></div>
+        <div class="page-title-row">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> DEFEND / MODEL PERFORMANCE</div>
+            <h1>Model performance.</h1>
+            <p>Inspect the calibrated threshold, error mix, and signals driving the current detector.</p>
+          </div>
+          <div class="title-stat teal"><span>MODEL VERSION</span><strong id="defense-version">C02</strong><small>hybrid
+              logistic + priors</small></div>
+        </div>
+        <div class="defense-kpis">
+          <div class="metric-panel"><span>PRECISION</span><strong id="def-precision">--</strong><small>low-friction
+              approvals</small></div>
+          <div class="metric-panel"><span>RECALL</span><strong id="def-recall">--</strong><small>attack capture</small>
+          </div>
+          <div class="metric-panel"><span>SPECIFICITY</span><strong id="def-specificity">--</strong><small>legitimate
+              confidence</small></div>
+          <div class="metric-panel dark"><span>THRESHOLD</span><strong id="def-threshold">--</strong><small>calibrated
+              guardrail</small></div>
+        </div>
+        <div class="risk-engine-panel">
+          <div class="risk-engine-head">
+            <div><span class="surface-kicker">RISK ENGINE / EXPLAINABLE PROCESSING</span>
+              <h3>How MasterShield reaches a decision</h3>
+              <p>Each stage is grounded in the signals and policies already used by the prototype.</p>
+            </div><span class="network-live"><span class="status-dot"></span> MODEL ONLINE</span>
+          </div>
+          <div class="risk-engine-pipeline" id="risk-engine-pipeline">
+            <div><span>01</span><i data-lucide="inbox"></i><strong>Event</strong><small>payment received</small></div>
+            <b>→</b>
+            <div><span>02</span><i data-lucide="scan-line"></i><strong>Signals</strong><small>device + graph +
+                context</small></div><b>→</b>
+            <div><span>03</span><i data-lucide="braces"></i><strong>Features</strong><small>24 model inputs</small>
+            </div><b>→</b>
+            <div><span>04</span><i data-lucide="brain-circuit"></i><strong>Analysis</strong><small>hybrid model +
+                priors</small></div><b>→</b>
+            <div class="engine-decision"><span>05</span><i
+                data-lucide="shield-alert"></i><strong>Decision</strong><small>risk score + policy</small></div>
+          </div>
+        </div>
+        <div class="defense-grid">
+          <div class="surface importance-surface">
+            <div class="surface-head">
+              <div><span class="surface-kicker">MODEL EXPLANATION</span>
+                <h3>Signals with the most lift</h3>
+              </div><span class="mono muted-text">absolute weight</span>
+            </div>
+            <div id="importance-list" class="importance-list"></div>
+          </div>
+          <div class="surface matrix-surface">
+            <div class="surface-head">
+              <div><span class="surface-kicker">GENERATED HOLDOUT</span>
+                <h3>Decision quality</h3>
+              </div><span class="calibration-chip">FPR guardrail 3.5%</span>
+            </div>
+            <div class="matrix">
+              <div class="matrix-axis y-axis"><span>actual attack</span><span>actual legitimate transaction</span></div>
+              <div class="matrix-grid">
+                <div class="matrix-cell tp"><span>TP</span><strong id="matrix-tp">--</strong><small>caught</small></div>
+                <div class="matrix-cell fn"><span>FN</span><strong id="matrix-fn">--</strong><small>missed</small></div>
+                <div class="matrix-cell fp"><span>FP</span><strong id="matrix-fp">--</strong><small>friction</small>
+                </div>
+                <div class="matrix-cell tn"><span>TN</span><strong id="matrix-tn">--</strong><small>clean</small></div>
+              </div>
+              <div class="matrix-axis x-axis"><span>flag or review</span><span>approve</span></div>
+            </div>
+            <div class="matrix-foot"><span class="status-dot"></span><span id="matrix-footnote">Untouched generated
+                holdout.</span></div>
+          </div>
+        </div>
+        <div class="surface history-surface">
+          <div class="surface-head">
+            <div><span class="surface-kicker">CLOSED-LOOP HISTORY</span>
+              <h3>How the model has changed</h3>
+            </div>
+          </div>
+          <div id="history-list" class="history-list"></div>
+        </div>
+        <div class="surface history-surface">
+          <div class="surface-head">
+            <div><span class="surface-kicker">MODEL GOVERNANCE</span>
+              <h3>Champion, challengers, and rollback</h3>
+            </div>
+          </div>
+          <div id="model-lifecycle" class="history-list"></div>
+        </div>
       </section>
 
       <section class="view" id="view-evidence">
-        <div class="page-title-row"><div><div class="eyebrow"><span class="eyebrow-line"></span> VALIDATE / READINESS</div><h1>Validation and readiness.</h1><p>See what is measured in the prototype and what a production pilot still needs.</p></div><div class="title-stat accent"><span>HOLDOUT STATUS</span><strong>READY</strong><small>synthetic evidence</small></div></div>
-        <div class="evaluation-panel"><div class="evaluation-head"><div><span class="surface-kicker">MODEL EVALUATION / SYNTHETIC HOLDOUT</span><h3>Detection curves and operating point</h3><p>The curves are derived from generated holdout score bins. They provide evaluation evidence, not production claims.</p></div><div class="evaluation-badges"><span><b id="evaluation-auc">--</b> ROC AUC</span><span><b id="evaluation-pr-auc">--</b> PR AUC</span></div></div><div class="evaluation-controls"><label for="evaluation-threshold">OPERATING THRESHOLD <output id="evaluation-threshold-value" for="evaluation-threshold">--</output></label><input id="evaluation-threshold" type="range" min="0" max="1" step="0.01" value="0.50" aria-label="Change evaluation operating threshold"><span id="evaluation-operating-point">-- recall · -- FPR</span></div><canvas id="evaluation-curves" width="900" height="250" aria-label="ROC and precision-recall curves derived from synthetic holdout bins" role="img"></canvas></div>
-        <div class="evidence-grid evidence-grid-single"><div class="surface evidence-principles"><div class="surface-head"><div><span class="surface-kicker">VALIDATION BASIS</span><h3>What this prototype demonstrates</h3></div></div><div class="principle-row"><div class="principle-index">01</div><div><strong>Broad attack coverage</strong><span>24 hypotheses cover cards, instant payments, wallets, merchants, refunds, identity, and social engineering.</span></div></div><div class="principle-row"><div class="principle-index">02</div><div><strong>Correlated simulation</strong><span>Scenario recipes move transaction, device, graph, session, and content signals together.</span></div></div><div class="principle-row"><div class="principle-index">03</div><div><strong>Closed-loop learning</strong><span>Hard cases can be promoted into the next cycle while evaluation data stays separate.</span></div></div></div></div>
-        <div class="surface external-evidence-panel"><div class="surface-head"><div><span class="surface-kicker">INDIA CONTEXT / PUBLIC EVIDENCE</span><h3>Why these scenarios matter locally</h3><p>Official Indian sources ground the synthetic attack catalog in the scale and shape of the payment ecosystem. They support relevance—not model accuracy.</p></div><span class="evidence-source-badge"><span class="status-dot"></span> 3 AUTHORITIES</span></div><div id="external-evidence-list" class="external-evidence-list"></div><div class="external-evidence-foot"><span>External context is kept separate from the synthetic holdout used for ROC, PR, recall, and FPR.</span><span class="mono">SOURCES VERIFIED AUG 2026</span></div></div>
+        <div class="page-title-row">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> VALIDATE / READINESS</div>
+            <h1>Validation and readiness.</h1>
+            <p>See what is measured in the prototype and what a production pilot still needs.</p>
+          </div>
+          <div class="title-stat accent"><span>HOLDOUT STATUS</span><strong>READY</strong><small>synthetic
+              evidence</small></div>
+        </div>
+        <div class="evaluation-panel">
+          <div class="evaluation-head">
+            <div><span class="surface-kicker">MODEL EVALUATION / SYNTHETIC HOLDOUT</span>
+              <h3>Detection curves and operating point</h3>
+              <p>The curves are derived from generated holdout score bins. They provide evaluation evidence, not
+                production claims.</p>
+            </div>
+            <div class="evaluation-badges"><span><b id="evaluation-auc">--</b> ROC AUC</span><span><b
+                  id="evaluation-pr-auc">--</b> PR AUC</span></div>
+          </div>
+          <div class="evaluation-controls"><label for="evaluation-threshold">OPERATING THRESHOLD <output
+                id="evaluation-threshold-value" for="evaluation-threshold">--</output></label><input
+              id="evaluation-threshold" type="range" min="0" max="1" step="0.01" value="0.50"
+              aria-label="Change evaluation operating threshold"><span id="evaluation-operating-point">-- recall · --
+              FPR</span></div><canvas id="evaluation-curves" width="900" height="250"
+            aria-label="ROC and precision-recall curves derived from synthetic holdout bins" role="img"></canvas>
+        </div>
+        <div class="evidence-grid evidence-grid-single">
+          <div class="surface evidence-principles">
+            <div class="surface-head">
+              <div><span class="surface-kicker">VALIDATION BASIS</span>
+                <h3>What this prototype demonstrates</h3>
+              </div>
+            </div>
+            <div class="principle-row">
+              <div class="principle-index">01</div>
+              <div><strong>Broad attack coverage</strong><span>24 hypotheses cover cards, instant payments, wallets,
+                  merchants, refunds, identity, and social engineering.</span></div>
+            </div>
+            <div class="principle-row">
+              <div class="principle-index">02</div>
+              <div><strong>Correlated simulation</strong><span>Scenario recipes move transaction, device, graph,
+                  session, and content signals together.</span></div>
+            </div>
+            <div class="principle-row">
+              <div class="principle-index">03</div>
+              <div><strong>Closed-loop learning</strong><span>Hard cases can be promoted into the next cycle while
+                  evaluation data stays separate.</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="surface external-evidence-panel">
+          <div class="surface-head">
+            <div><span class="surface-kicker">INDIA CONTEXT / PUBLIC EVIDENCE</span>
+              <h3>Why these scenarios matter locally</h3>
+              <p>Official Indian sources ground the synthetic attack catalog in the scale and shape of the payment
+                ecosystem. They support relevance—not model accuracy.</p>
+            </div><span class="evidence-source-badge"><span class="status-dot"></span> 3 AUTHORITIES</span>
+          </div>
+          <div id="external-evidence-list" class="external-evidence-list"></div>
+          <div class="external-evidence-foot"><span>External context is kept separate from the synthetic holdout used
+              for ROC, PR, recall, and FPR.</span><span class="mono">SOURCES VERIFIED AUG 2026</span></div>
+        </div>
       </section>
 
       <section class="view" id="view-fidelity">
-        <div class="page-title-row"><div><div class="eyebrow"><span class="eyebrow-line"></span> MEASURE / SYNTHETIC EVIDENCE</div><h1>Fidelity and robustness.</h1><p>Compare generated streams and stress the detector on harder synthetic conditions.</p></div><div class="title-stat teal"><span>EVIDENCE STATUS</span><strong>SYNTHETIC</strong><small>not a production claim</small></div></div>
-        <div class="defense-kpis"><div class="metric-panel"><span>MEAN FEATURE DISTANCE</span><strong id="fidelity-distance">--</strong><small>lower is closer</small></div><div class="metric-panel"><span>SCENARIO MIX DISTANCE</span><strong id="fidelity-scenario-distance">--</strong><small>distribution shift</small></div><div class="metric-panel"><span>UNSEEN ATTACK RECALL</span><strong id="fidelity-unseen-recall">--</strong><small>held-out families</small></div><div class="metric-panel dark"><span>POLICY FRICTION</span><strong id="fidelity-friction">--</strong><small>synthetic estimate</small></div></div>
-        <div class="fidelity-hero-panel"><div class="fidelity-hero-head"><div><span class="surface-kicker">DETECTOR PERFORMANCE UNDER ADVERSARIAL CONDITIONS</span><h3>Robustness heatmap</h3><p>Detection recall across deterministic synthetic stress conditions. Hover over or focus on a cell for details.</p></div><span class="network-live"><span class="status-dot"></span> SYNTHETIC EVIDENCE</span></div><div class="robustness-heatmap" id="robustness-heatmap" role="table" aria-label="Detector robustness heatmap"></div><div class="heatmap-detail" id="heatmap-detail">Select a cell to inspect the detection rate, false-positive rate, and confidence.</div></div>
-        <div class="evidence-grid"><div class="surface evidence-principles"><div class="surface-head"><div><span class="surface-kicker">ROBUSTNESS MATRIX</span><h3>Detector under stress</h3></div><button class="primary-button small" id="refresh-fidelity"><i data-lucide="refresh-cw"></i> Run evaluation</button></div><div id="robustness-list" class="importance-list"></div></div><div class="surface artifact-list"><div class="surface-head"><div><span class="surface-kicker">POLICY TRADEOFF</span><h3>Friction versus loss</h3></div><button class="icon-button quiet" id="export-report" title="Export synthetic report" aria-label="Export synthetic report"><i data-lucide="download"></i></button></div><div id="policy-tradeoff" class="importance-list"></div></div></div>
-        <div class="surface runbook-surface"><div class="surface-head"><div><span class="surface-kicker">ADAPTIVE RED TEAM</span><h3>Find a detector blind spot</h3></div><button class="primary-button small" id="run-mutation"><i data-lucide="wand-sparkles"></i> Mutate a synthetic attack</button></div><div id="mutation-result" class="empty-state"><strong>No mutation search yet.</strong><span>Run the adaptive composer to inspect the mutation path and lowest-risk synthetic candidates.</span></div></div>
+        <div class="page-title-row">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> MEASURE / SYNTHETIC EVIDENCE</div>
+            <h1>Fidelity and robustness.</h1>
+            <p>Compare generated streams and stress the detector on harder synthetic conditions.</p>
+          </div>
+          <div class="title-stat teal"><span>EVIDENCE STATUS</span><strong>SYNTHETIC</strong><small>not a production
+              claim</small></div>
+        </div>
+        <div class="defense-kpis">
+          <div class="metric-panel"><span>MEAN FEATURE DISTANCE</span><strong
+              id="fidelity-distance">--</strong><small>lower is closer</small></div>
+          <div class="metric-panel"><span>SCENARIO MIX DISTANCE</span><strong
+              id="fidelity-scenario-distance">--</strong><small>distribution shift</small></div>
+          <div class="metric-panel"><span>UNSEEN ATTACK RECALL</span><strong
+              id="fidelity-unseen-recall">--</strong><small>held-out families</small></div>
+          <div class="metric-panel dark"><span>POLICY FRICTION</span><strong
+              id="fidelity-friction">--</strong><small>synthetic estimate</small></div>
+        </div>
+        <div class="fidelity-hero-panel">
+          <div class="fidelity-hero-head">
+            <div><span class="surface-kicker">DETECTOR PERFORMANCE UNDER ADVERSARIAL CONDITIONS</span>
+              <h3>Robustness heatmap</h3>
+              <p>Detection recall across deterministic synthetic stress conditions. Hover over or focus on a cell for
+                details.</p>
+            </div><span class="network-live"><span class="status-dot"></span> SYNTHETIC EVIDENCE</span>
+          </div>
+          <div class="robustness-heatmap" id="robustness-heatmap" role="table" aria-label="Detector robustness heatmap">
+          </div>
+          <div class="heatmap-detail" id="heatmap-detail">Select a cell to inspect the detection rate, false-positive
+            rate, and confidence.</div>
+        </div>
+        <div class="evidence-grid">
+          <div class="surface evidence-principles">
+            <div class="surface-head">
+              <div><span class="surface-kicker">ROBUSTNESS MATRIX</span>
+                <h3>Detector under stress</h3>
+              </div><button class="primary-button small" id="refresh-fidelity"><i data-lucide="refresh-cw"></i> Run
+                evaluation</button>
+            </div>
+            <div id="robustness-list" class="importance-list"></div>
+          </div>
+          <div class="surface artifact-list">
+            <div class="surface-head">
+              <div><span class="surface-kicker">POLICY TRADEOFF</span>
+                <h3>Friction versus loss</h3>
+              </div><button class="icon-button quiet" id="export-report" title="Export synthetic report"
+                aria-label="Export synthetic report"><i data-lucide="download"></i></button>
+            </div>
+            <div id="policy-tradeoff" class="importance-list"></div>
+          </div>
+        </div>
+        <div class="surface runbook-surface">
+          <div class="surface-head">
+            <div><span class="surface-kicker">ADAPTIVE RED TEAM</span>
+              <h3>Find a detector blind spot</h3>
+            </div><button class="primary-button small" id="run-mutation"><i data-lucide="wand-sparkles"></i> Mutate a
+              synthetic attack</button>
+          </div>
+          <div id="mutation-result" class="empty-state"><strong>No mutation search yet.</strong><span>Run the adaptive
+              composer to inspect the mutation path and lowest-risk synthetic candidates.</span></div>
+        </div>
       </section>
 
-      <footer class="app-footer"><div class="footer-brand"><svg class="mastercard-mark" viewBox="0 0 48 30" role="img" aria-label="Mastercard"><defs><clipPath id="mastercard-overlap"><circle cx="30" cy="15" r="13"></circle></clipPath></defs><circle cx="18" cy="15" r="13" fill="#eb001b"></circle><circle cx="30" cy="15" r="13" fill="#f79e1b"></circle><circle cx="18" cy="15" r="13" fill="#ff5f00" clip-path="url(#mastercard-overlap)"></circle></svg><div><strong>MasterShield</strong><span>Built for the digital economy. Securing every connection.</span></div></div><span>INDEPENDENT CHALLENGE PROTOTYPE / SYNTHETIC EVIDENCE</span><span class="mono">v1.1.0</span></footer>
+      <footer class="app-footer">
+        <div class="footer-brand"><svg class="mastercard-mark" viewBox="0 0 48 30" role="img" aria-label="Mastercard">
+            <defs>
+              <clipPath id="mastercard-overlap">
+                <circle cx="30" cy="15" r="13"></circle>
+              </clipPath>
+            </defs>
+            <circle cx="18" cy="15" r="13" fill="#eb001b"></circle>
+            <circle cx="30" cy="15" r="13" fill="#f79e1b"></circle>
+            <circle cx="18" cy="15" r="13" fill="#ff5f00" clip-path="url(#mastercard-overlap)"></circle>
+          </svg>
+          <div><strong>MasterShield</strong><span>Built for the digital economy. Securing every connection.</span></div>
+        </div><span>INDEPENDENT CHALLENGE PROTOTYPE / SYNTHETIC EVIDENCE</span><span class="mono">v1.1.0</span>
+      </footer>
     </main>
   </div>
   <div class="toast" id="toast" role="status"></div>
   <dialog class="detail-dialog" id="transaction-dialog" aria-labelledby="transaction-dialog-title">
-    <div class="dialog-head"><div><span class="surface-kicker">DECISION EXPLANATION</span><h2 id="transaction-dialog-title">Transaction</h2></div><button class="icon-button quiet" data-dialog-close="transaction-dialog" aria-label="Close explanation" title="Close explanation"><i data-lucide="x"></i></button></div>
+    <div class="dialog-head">
+      <div><span class="surface-kicker">DECISION EXPLANATION</span>
+        <h2 id="transaction-dialog-title">Transaction</h2>
+      </div><button class="icon-button quiet" data-dialog-close="transaction-dialog" aria-label="Close explanation"
+        title="Close explanation"><i data-lucide="x"></i></button>
+    </div>
     <div class="dialog-body" id="transaction-dialog-content"></div>
   </dialog>
   <dialog class="detail-dialog" id="attack-dialog" aria-labelledby="attack-dialog-title">
-    <div class="dialog-head"><div><span class="surface-kicker">ATTACK INTELLIGENCE</span><h2 id="attack-dialog-title">Scenario</h2></div><button class="icon-button quiet" data-dialog-close="attack-dialog" aria-label="Close scenario" title="Close scenario"><i data-lucide="x"></i></button></div>
+    <div class="dialog-head">
+      <div><span class="surface-kicker">ATTACK INTELLIGENCE</span>
+        <h2 id="attack-dialog-title">Scenario</h2>
+      </div><button class="icon-button quiet" data-dialog-close="attack-dialog" aria-label="Close scenario"
+        title="Close scenario"><i data-lucide="x"></i></button>
+    </div>
     <div class="dialog-body" id="attack-dialog-content"></div>
   </dialog>
   <dialog class="detail-dialog queue-dialog" id="queue-dialog" aria-labelledby="queue-dialog-title">
-    <div class="dialog-head"><div><span class="surface-kicker">FEEDBACK QUEUE</span><h2 id="queue-dialog-title">Queued hard cases</h2></div><button class="icon-button quiet" data-dialog-close="queue-dialog" aria-label="Close feedback queue" title="Close feedback queue"><i data-lucide="x"></i></button></div>
+    <div class="dialog-head">
+      <div><span class="surface-kicker">FEEDBACK QUEUE</span>
+        <h2 id="queue-dialog-title">Queued hard cases</h2>
+      </div><button class="icon-button quiet" data-dialog-close="queue-dialog" aria-label="Close feedback queue"
+        title="Close feedback queue"><i data-lucide="x"></i></button>
+    </div>
     <div class="dialog-body" id="queue-dialog-content"></div>
   </dialog>
   <dialog class="command-palette" id="command-palette" aria-labelledby="command-palette-title">
-    <div class="command-head"><div><span class="surface-kicker">QUICK NAVIGATION</span><h2 id="command-palette-title">Command palette</h2></div><button class="icon-button quiet" data-dialog-close="command-palette" aria-label="Close command palette"><i data-lucide="x"></i></button></div>
-    <div class="command-search"><i data-lucide="search"></i><input id="command-search" type="search" placeholder="Search views, transactions, entities, or threats…" aria-label="Search views, transactions, entities, or threats"></div>
+    <div class="command-head">
+      <div><span class="surface-kicker">QUICK NAVIGATION</span>
+        <h2 id="command-palette-title">Command palette</h2>
+      </div><button class="icon-button quiet" data-dialog-close="command-palette" aria-label="Close command palette"><i
+          data-lucide="x"></i></button>
+    </div>
+    <div class="command-search"><i data-lucide="search"></i><input id="command-search" type="search"
+        placeholder="Search views, transactions, entities, or threats…"
+        aria-label="Search views, transactions, entities, or threats"></div>
     <div class="command-results" id="command-results" hidden></div>
     <div class="command-list" id="command-list">
-      <button data-command-view="overview"><i data-lucide="layout-dashboard"></i><span><strong>Security overview</strong><small>See score, threats, and activity</small></span><kbd>⌘ 1</kbd></button>
-      <button data-command-view="attacks"><i data-lucide="scan-search"></i><span><strong>Threat intelligence</strong><small>Browse attack hypotheses</small></span><kbd>⌘ 2</kbd></button>
-      <button data-command-view="simulate"><i data-lucide="play"></i><span><strong>Run a simulation</strong><small>Generate a synthetic adversarial stream</small></span><kbd>⌘ 3</kbd></button>
-      <button data-command-view="defense"><i data-lucide="shield-check"></i><span><strong>Open risk engine</strong><small>Inspect explanations and model quality</small></span><kbd>⌘ 4</kbd></button>
-      <button data-command-view="evidence"><i data-lucide="chart-no-axes-combined"></i><span><strong>Open validation</strong><small>Review ROC, precision-recall, and holdout evidence</small></span><kbd>⌘ 5</kbd></button>
-      <button data-command-view="fidelity"><i data-lucide="activity"></i><span><strong>View synthetic evidence</strong><small>Stress-test the detector</small></span><kbd>⌘ 6</kbd></button>
+      <button data-command-view="overview"><i data-lucide="layout-dashboard"></i><span><strong>Security
+            overview</strong><small>See score, threats, and activity</small></span><kbd>⌘ 1</kbd></button>
+      <button data-command-view="attacks"><i data-lucide="scan-search"></i><span><strong>Threat
+            intelligence</strong><small>Browse attack hypotheses</small></span><kbd>⌘ 2</kbd></button>
+      <button data-command-view="simulate"><i data-lucide="play"></i><span><strong>Run a
+            simulation</strong><small>Generate a synthetic adversarial stream</small></span><kbd>⌘ 3</kbd></button>
+      <button data-command-view="defense"><i data-lucide="shield-check"></i><span><strong>Open risk
+            engine</strong><small>Inspect explanations and model quality</small></span><kbd>⌘ 4</kbd></button>
+      <button data-command-view="evidence"><i data-lucide="chart-no-axes-combined"></i><span><strong>Open
+            validation</strong><small>Review ROC, precision-recall, and holdout evidence</small></span><kbd>⌘
+          5</kbd></button>
+      <button data-command-view="fidelity"><i data-lucide="activity"></i><span><strong>View synthetic
+            evidence</strong><small>Stress-test the detector</small></span><kbd>⌘ 6</kbd></button>
     </div>
   </dialog>
   <script src="demo-data.js"></script>
   <script src="app.js"></script>
 </body>
+
 </html>
